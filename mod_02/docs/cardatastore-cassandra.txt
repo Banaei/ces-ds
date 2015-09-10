@@ -1,0 +1,12 @@
+help create keyspace;create keyspace CarDataStore  with placement_strategy = 'org.apache.cassandra.locator.SimpleStrategy' and strategy_options = {replication_factor:1};show keyspaces;use CarDataStore;help create column family;create column family Cars  with comparator = UTF8Type
+  and key_validation_class=UTF8Type
+  and default_validation_class=UTF8Type  and gc_grace = 0  and min_compaction_threshold = 5 and max_compaction_threshold = 31;
+
+/* Si erreur 'cannot parse 'Prius' as hex bytes
+': assume Cars keys as ascii;*/
+ 
+set Cars['Prius']['make'] = 'toyota';set Cars['Prius']['model'] = 'prius 3';set Cars['Corolla']['make'] = 'toyota';set Cars['Corolla']['model'] = 'le';set Cars['fit']['make'] = 'honda';set Cars['fit']['model'] = 'fit sport';set Cars['focus']['make'] = 'ford';set Cars['focus']['model'] = 'sel';
+
+
+get Cars['Prius'];
+get Cars['Prius']['make'];/**** si le resultat est affiche en hexadecimal****//*update column family Cars with column_metadata=[{column_name: make, validation_class: UTF8Type}];*/

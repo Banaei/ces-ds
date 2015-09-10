@@ -1,0 +1,38 @@
+Importation des données :
+
+Alireza@PORTABANAEI /c/Applications/mongodb-win32-i386-2.0.1
+$ mongoimport.exe --type json -d geodb -c earthquakes --file "/C/Users/Alireza/Google Drive/work/FormationDS/Cours/Mod02_StructuredData/earthquakes_big.geojson"
+connected to: 127.0.0.1
+imported 7669 objects
+
+
+// Ajouter une colonne iso_date dont la valeur est la conversion du timestamp contenu dans properties.time
+
+db.earthquakes.find().forEach(
+  function(eq){
+    eq.properties.iso_date = new
+    Date(eq.properties.time); db.earthquakes.save(eq);
+ }
+);
+
+
+// Convertir la chaîne de caractère du champ properties.types en tableau et le mettre dans un champ types_as_array
+// Utiliser la fonction ch.split(",") qui permet de séparer une chaine de caractère ch en plusieurs mots selon le séparateur "
+
+db.earthquakes.find().forEach(
+  function(eq){
+    var str = new String(eq.properties.types);
+    eq.properties.types_as_array = str.split(",");
+    db.earthquakes.save(eq); }
+  );
+  
+//  Nettoyer les éléments vides ("") du tableau properties.types_as_array
+db.earthquakes.update(
+  {},
+  { $pull: { properties.types_as_array : [""] } },
+  { multi: true }
+)
+
+
+// Donnez le nombre de documents dont la liste de type contient "geoserves" et "tectonic-summary"
+db.earthquakes.find({$and:[{"properties.types_as_array":"geoserve"},{"properties.types_as_array":"tectonic-summary"}]}).pretty();

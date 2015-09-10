@@ -1,0 +1,202 @@
+/* Body */
+@font-face {
+        font-family: 'Fabiana';
+        src:  url("../../../../programs/fabiana/Fabiana/Fabiana-font.svg") format('svg');
+       }
+       @font-face {
+        font-family: 'Fabiana';
+		font-weight: bold;
+        src:  url("../../../../programs/fabiana/Fabiana/Fabiana-bold-font.svg") format('svg');
+       }
+       @font-face {
+        font-family: 'Fabiana';
+		font-style: italic;
+        src:  url("../../../../programs/fabiana/Fabiana/Fabiana-italic-font.svg") format('svg');
+		}
+BODY {
+ max-width: 60em;
+ margin: auto;
+ font-family: Fabiana, sans-serif;
+ text-align: justify;
+ }
+/* Sections */
+h1 {
+ font-weight: bold;
+ font-size: 200%;
+ margin-top: 1em;
+ text-align: center;
+ }
+h2 {
+ font-weight: bold;
+ font-size: 120%;
+ margin-top: 1em;
+ text-align: left;
+ border-top: solid;
+ border-bottom: solid;
+ border-width: thin;
+ padding-left: 2em;
+ padding-top: 0.2em;
+ padding-Bottom: 0.2em;
+ }
+h3 {
+ font-weight: normal;
+ font-size: 100%;
+ margin-top: 1em;
+ text-align: left;
+ text-decoration: underline;
+ padding-left: 0em;
+ padding-top: 0.2em;
+ padding-Bottom: 0.2em;
+ }
+  sub {
+    font-size: 60%;
+	vertical-align: -0.3em;
+  }
+  th {
+    text-decoration: underline;
+	text-align: left;
+  }
+  td {
+    padding-right: 1em;
+  }
+  table {
+    margin-left: 2em;
+	margin-top: 1em;
+	color: inherit;
+  }
+code {
+ font-family: monospace;
+ font-size: 125%;
+}
+p {
+ margin-top: 1em;
+ margin-bottom: 0em;
+ padding-top: 0 em;
+ padding-bottom: 0 em;
+ }
+li {
+ padding-top: 0.2em;
+ padding-bottom: 0.2em;
+ }
+ol,ul {
+ padding-top: 0em;
+ padding-bottom: 0em;
+ margin-top: 0em;
+ margin-bottom: 0em;
+ }
+
+/***********************************
+*                                  *
+* To switch the answers on or off, *
+* set the visibility to 'visible'  *
+* or 'hidden' in the following     *
+* declaration                      *
+*                                  *
+***********************************/
+
+  div.answer {
+    padding-top: 1em;
+    padding-bottom: 1em;
+	padding-left: 3em;
+	color: green;
+	font-family: cursive;
+	visibility: hidden;
+  }
+  div.comment {
+    padding-bottom: 1em;
+	padding-left: 3em;
+	color: red;
+	font-family: cursive;
+	visibility: hidden;
+  }
+  div.grading {
+    padding-bottom: 1em;
+	padding-left: 3em;
+	color: purple;
+	font-family: cursive;
+	visibility: hidden;
+  }
+  .skipped {
+    display: none;
+  }
+  .code {
+    font-family: monospace;
+	padding-left: 2em;
+  }
+  .space{
+    padding-top:2em;
+  }
+  div.text {
+    padding-left:2em;
+	color: blue;
+  }
+  span.text {
+    color: blue;
+  }
+  span.points {
+    color:red;
+  }
+  span.points:before {
+    content: "\00A0\00A0\00A0\00A0[";
+  }
+  span.points:after {
+    content: " points]";
+  }
+  span.point {
+    color:red;
+  }
+  span.point:before {
+    content: "\00A0\00A0\00A0\00A0[";
+  }
+  span.point:after {
+    content: " point]";
+  }
+.email {
+	border-style:solid;
+	border-width:1px;
+	padding-left: 5px;
+}
+.alpha {
+	list-style-type: lower-alpha;
+}
+.codeblock {
+	margin-left: 5em;
+	margin-top: 0.5em;
+	margin-bottom: 0.5em;
+}
+.examtext {
+ margin-top:2em;
+ margin-bottom:2em;
+}
+.examtext:before {
+  content:"This tutorial works like an exam. Answer these questions on this sheet of paper in the space provided. ";
+}
+.author {
+  text-align: center;
+}
+.highlight {
+  color: red;
+}
+h2.questions:before {
+  content: "Questions";
+}
+h2.submission:before {
+  content: "Submission";
+}
+.submissionnowtext:before {
+  content: "Hand in these sheets of paper with your answer at the end of this tutorial."
+}
+.submissionlatertext:before {
+  content: "Compress all requested files (code and data) into a file called {LASTNAME}_{FIRSTNAME}.zip. Send this file by email to fabian@suchanek.name no later than tomorrow 8:30. The subject of the mail should be 'CES 2014 lab LASTNAME FIRSTNAME'."
+}
+.submissionlastdaylatertext:before {
+  content: "Compress all requested files (code and data) into a file called {LASTNAME}_{FIRSTNAME}_{TUTORIALNUMBER}.zip. Make sure to maintain the directory structure of the java packages. Send this file by email to athens@luisgalarraga.de no later than tomorrow 8:30."
+}
+.warn {
+  padding-left: 1em;
+  margin-left: 2em;
+  border-left: solid;
+  border-left-width: normal;
+  border-left-color: red;
+  margin-top: 2em;
+}
