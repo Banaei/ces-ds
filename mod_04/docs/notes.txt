@@ -1,2 +1,0 @@
-mplayer -vo jpeg -forceidx  -sstep 1 -vf scale -zoom -xy 320 /srv/athens/
-mplayer.exe -vo jpeg -forceidx  -sstep 1 -vf scale -zoom -xy 320 /d/Alireza/06-11-22.avi
