@@ -133,4 +133,4 @@ plt.plot(gps_array[:,1], gps_array[:,0], '.')
 plt.ylim((np.min(gps_array[:,0]),np.max(gps_array[:,0])))
 
 
-anos_list, rsa_data = get_data(shord_ano_file_path, short_rsa_file_path, formats.ano_2009_format, formats.rsa_2009_format, cp_list, gps_array)
+anos_list, rsa_data = get_data(big_ano_file_path, big_rsa_file_path, formats.ano_2009_format, formats.rsa_2009_format, cp_list, gps_array)
