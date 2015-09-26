@@ -40,6 +40,7 @@ def load_cp_gps(f_cp, f_gps):
     with open(cp_file_path, 'r') as f:
         reader = csv.reader(f)
         cp_list = list(reader) 
+    cp_list = reduce(lambda x,y: x+y,cp_list)
 
     # Deleting nan values from gps and also corresponding poste codes
     # Usind reverse sorted to delete the list elements by the end
@@ -126,11 +127,11 @@ def get_data(ano_file_path, rsa_file_path, ano_format, rsa_format, cp_list, gps_
 # gps_array : nx2 array containing latitude and longitude of postal codes of cp_list (in order)
 cp_list, gps_array = load_cp_gps(cp_file_path, gps_file_path)
 
-
-
 # Checking the gps values :)
 plt.plot(gps_array[:,1], gps_array[:,0], '.')
 plt.ylim((np.min(gps_array[:,0]),np.max(gps_array[:,0])))
 
-
 anos_list, rsa_data = get_data(shord_ano_file_path, short_rsa_file_path, formats.ano_2009_format, formats.rsa_2009_format, cp_list, gps_array)
+
+plt.plot(rsa_data[:,1], rsa_data[:,0], '.')
+plt.ylim((np.min(rsa_data[:,0]),np.max(rsa_data[:,0])))
