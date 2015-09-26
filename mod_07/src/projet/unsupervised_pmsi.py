@@ -99,6 +99,7 @@ def get_data(ano_file_path, rsa_file_path, ano_format, rsa_format, cp_list, gps_
     rsa_data = list()
     anos_list = list()
     i = 0
+    added = 0
     with open(rsa_file_path) as rsa_file:
         with open(ano_file_path) as ano_file:
             while True:
@@ -109,10 +110,11 @@ def get_data(ano_file_path, rsa_file_path, ano_format, rsa_format, cp_list, gps_
                     gps = get_gps_from_rsa(rsa_line, rsa_format, cp_list, gps_array)
                     rsa_data.append([gps[0], gps[1], age])
                     anos_list.append(get_ano(ano_line, ano_format))
+                    added += 1
                 if not rsa_line and not ano_line:
                     break
                 if i % 1000 == 0:
-                    print '\rPorcessed %s' % (i),   
+                    print '\rPorcessed %s, %s added' % (i, added),   
                 i += 1         
     return anos_list, np.asarray(rsa_data)
     
