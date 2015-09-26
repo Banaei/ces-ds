@@ -10,6 +10,7 @@ from numpy import genfromtxt
 import csv
 import matplotlib.pyplot as plt
 import formats
+from random import randint    
     
 # ##########################################
 # Constants
@@ -22,7 +23,7 @@ big_rsa_file_path = '../../../../extra_data/pmsi/2009/rsa09.txt'
 big_ano_file_path = '../../../../extra_data/pmsi/2009/ano09.txt'
 short_rsa_file_path = '../../../../extra_data/pmsi/2009/rsa09_short.txt'
 shord_ano_file_path = '../../../../extra_data/pmsi/2009/ano09_short.txt'
-proportion = 0.1
+proportion = 10 # in percent
 
 
 
@@ -111,11 +112,12 @@ def get_data(ano_file_path, rsa_file_path, ano_format, rsa_format, cp_list, gps_
                 rsa_line = rsa_file.readline()
                 ano_line = ano_file.readline()
                 if (is_rsa_ok(rsa_line, rsa_format) and is_ano_ok(ano_line, ano_format) and is_rsa_cancer(rsa_line, rsa_format) and is_rsa_code_geo_in_cp_list(rsa_line, rsa_format, cp_list)):
-                    age = get_age_in_rsa(rsa_line, rsa_format)
-                    gps = get_gps_from_rsa(rsa_line, rsa_format, cp_list, gps_array)
-                    rsa_data.append([gps[0], gps[1], age])
-                    anos_list.append(get_ano(ano_line, ano_format))
-                    added += 1
+                    if (randint(0,100)<proportion):
+                        age = get_age_in_rsa(rsa_line, rsa_format)
+                        gps = get_gps_from_rsa(rsa_line, rsa_format, cp_list, gps_array)
+                        rsa_data.append([gps[0], gps[1], age])
+                        anos_list.append(get_ano(ano_line, ano_format))
+                        added += 1
                 if not rsa_line and not ano_line:
                     break
                 if i % 1000 == 0:
@@ -139,3 +141,7 @@ anos_list, rsa_data = get_data(big_ano_file_path, big_rsa_file_path, formats.ano
 
 plt.plot(rsa_data[:,1], rsa_data[:,0], '.')
 plt.ylim((np.min(rsa_data[:,0]),np.max(rsa_data[:,0])))
+
+
+
+print(randint(0,9))
