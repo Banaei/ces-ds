@@ -144,4 +144,10 @@ plt.ylim((np.min(rsa_data[:,0]),np.max(rsa_data[:,0])))
 
 
 
-print(randint(0,9))
+f = file("rsas.bin","wb")
+np.savez(f, rsa_data)
+f.close()
+
+import pickle
+with open('anos.pickle', 'wb') as f:
+    pickle.dump(anos_list, f)
