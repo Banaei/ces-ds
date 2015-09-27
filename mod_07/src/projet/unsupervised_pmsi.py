@@ -190,7 +190,7 @@ cp_list, gps_array = load_cp_gps(cp_file_path, gps_file_path)
 # Checking the gps values :)
 plot_2d(gps_array)
 
-rsa_data, diags_list = get_data(short_ano_file_path, short_rsa_file_path, formats.ano_2009_format, formats.rsa_2009_format, cp_list, gps_array)
+rsa_data, diags_list = get_data(big_ano_file_path, big_rsa_file_path, formats.ano_2009_format, formats.rsa_2009_format, cp_list, gps_array)
 save_data(diags_list, rsa_data, diags_file_path, rsas_file_path)
 plot_2d(rsa_data)
 

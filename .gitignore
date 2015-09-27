@@ -58,3 +58,6 @@ target/
 
 # Data files
 
+# Backup files
+.orig
+
