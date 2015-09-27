@@ -25,7 +25,7 @@ big_rsa_file_path = '../../../../extra_data/pmsi/2009/rsa09.txt'
 big_ano_file_path = '../../../../extra_data/pmsi/2009/ano09.txt'
 short_rsa_file_path = '../../../../extra_data/pmsi/2009/rsa09_short.txt'
 short_ano_file_path = '../../../../extra_data/pmsi/2009/ano09_short.txt'
-anos_file_path='../../../../extra_data/pmsi/2009/anos.pickle'
+diags_file_path='../../../../extra_data/pmsi/2009/diags.pickle'
 rsas_file_path='../../../../extra_data/pmsi/2009/rsas.npz'
 proportion = 10 # in percent
 
@@ -97,6 +97,12 @@ def is_rsa_cancer(line, rsa_format):
             return True
     return False
     
+def get_diags_from_rsa(line, rsa_format):
+    dp = line[rsa_format['dp_sp'] - 1:rsa_format['dp_ep']].strip()
+    dr = line[rsa_format['dr_sp'] - 1:rsa_format['dr_ep']].strip()
+    return [dp, dr]
+
+    
 def is_rsa_code_geo_in_cp_list(line, rsa_format, cp_list):
     code_geo = line[rsa_format['code_geo_sp'] - 1:rsa_format['code_geo_ep']].strip()
     return code_geo in cp_list
@@ -114,6 +120,7 @@ def is_ano_in_the_list(ano, the_list):
 def get_data(ano_file_path, rsa_file_path, ano_format, rsa_format, cp_list, gps_array):
     rsa_data = list()
     anos_list = list()
+    diags_list = list()
     i = 0
     added = 0
     with open(rsa_file_path) as rsa_file:
@@ -130,26 +137,27 @@ def get_data(ano_file_path, rsa_file_path, ano_format, rsa_format, cp_list, gps_
                             gps = get_gps_from_rsa(rsa_line, rsa_format, cp_list, gps_array)
                             rsa_data.append([gps[0], gps[1], age])
                             anos_list.append(get_ano(ano_line, ano_format))
+                            diags_list.append(get_diags_from_rsa(rsa_line, rsa_format))
                             added += 1
                 if not rsa_line and not ano_line:
                     break
                 if i % 1000 == 0:
                     print '\rPorcessed %s, %s added' % (i, added),   
                 i += 1         
-    return anos_list, np.asarray(rsa_data)
+    return np.asarray(rsa_data), diags_list
     
-def save_data(anos_list, rsa_data, anos_file_path, rsas_file_path):
+def save_data(diags_list, rsa_data, diags_file_path, rsas_file_path):
     with open(rsas_file_path, 'wb') as f:
         np.savez(f, rsa_data)
-    with open(anos_file_path, 'wb') as f:
-        pickle.dump(anos_list, f)    
+    with open(diags_file_path, 'wb') as f:
+        pickle.dump(diags_list, f)    
     
-def load_data(anos_file_path, rsas_file_path):
-    with open(anos_file_path, 'r') as f:
-        anos = pickle.load(f)    
+def load_data(diags_file_path, rsas_file_path):
+    with open(diags_file_path, 'r') as f:
+        diags = pickle.load(f)    
     npzfile = np.load(rsas_file_path)
     rsas = npzfile['arr_0'] 
-    return anos, rsas
+    return rsas, diags
     
     
 def plot_2d(gps_rsas):
@@ -182,11 +190,11 @@ cp_list, gps_array = load_cp_gps(cp_file_path, gps_file_path)
 # Checking the gps values :)
 plot_2d(gps_array)
 
-anos_list, rsa_data = get_data(short_ano_file_path, short_rsa_file_path, formats.ano_2009_format, formats.rsa_2009_format, cp_list, gps_array)
-
+rsa_data, diags_list = get_data(short_ano_file_path, short_rsa_file_path, formats.ano_2009_format, formats.rsa_2009_format, cp_list, gps_array)
+save_data(diags_list, rsa_data, diags_file_path, rsas_file_path)
 plot_2d(rsa_data)
 
-anos, rsas = load_data(anos_file_path, rsas_file_path)
+rsas, diags = load_data(diags_file_path, rsas_file_path)
 
 plot_2d(rsas)
 plot_3d(rsas)
