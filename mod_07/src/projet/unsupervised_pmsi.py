@@ -11,6 +11,8 @@ import csv
 import matplotlib.pyplot as plt
 import formats
 from random import randint    
+import pickle
+
     
 # ##########################################
 # Constants
@@ -22,7 +24,9 @@ cancer_codes_first_caracter_1 = ['c', 'd0']
 big_rsa_file_path = '../../../../extra_data/pmsi/2009/rsa09.txt'
 big_ano_file_path = '../../../../extra_data/pmsi/2009/ano09.txt'
 short_rsa_file_path = '../../../../extra_data/pmsi/2009/rsa09_short.txt'
-shord_ano_file_path = '../../../../extra_data/pmsi/2009/ano09_short.txt'
+short_ano_file_path = '../../../../extra_data/pmsi/2009/ano09_short.txt'
+anos_file_path='../../../../extra_data/pmsi/2009/anos.pickle'
+rsas_file_path='../../../../extra_data/pmsi/2009/rsas.npz'
 proportion = 10 # in percent
 
 
@@ -100,7 +104,13 @@ def is_rsa_code_geo_in_cp_list(line, rsa_format, cp_list):
 def get_ano(line, ano_format):
     return line[ano_format['ano_sp'] - 1:ano_format['ano_ep']]
 
-
+def is_ano_in_the_list(ano, the_list):
+    try:
+        the_list.index(ano)
+        return 1
+    except ValueError:
+        return 0
+        
 def get_data(ano_file_path, rsa_file_path, ano_format, rsa_format, cp_list, gps_array):
     rsa_data = list()
     anos_list = list()
@@ -112,18 +122,54 @@ def get_data(ano_file_path, rsa_file_path, ano_format, rsa_format, cp_list, gps_
                 rsa_line = rsa_file.readline()
                 ano_line = ano_file.readline()
                 if (is_rsa_ok(rsa_line, rsa_format) and is_ano_ok(ano_line, ano_format) and is_rsa_cancer(rsa_line, rsa_format) and is_rsa_code_geo_in_cp_list(rsa_line, rsa_format, cp_list)):
-                    if (randint(0,100)<proportion):
-                        age = get_age_in_rsa(rsa_line, rsa_format)
-                        gps = get_gps_from_rsa(rsa_line, rsa_format, cp_list, gps_array)
-                        rsa_data.append([gps[0], gps[1], age])
-                        anos_list.append(get_ano(ano_line, ano_format))
-                        added += 1
+                    ano = get_ano(ano_line, ano_format)
+                    # Avoiding to take the same patient more than once
+                    if (~is_ano_in_the_list(ano, anos_list)):
+                        if (randint(0,100)<proportion):
+                            age = get_age_in_rsa(rsa_line, rsa_format)
+                            gps = get_gps_from_rsa(rsa_line, rsa_format, cp_list, gps_array)
+                            rsa_data.append([gps[0], gps[1], age])
+                            anos_list.append(get_ano(ano_line, ano_format))
+                            added += 1
                 if not rsa_line and not ano_line:
                     break
                 if i % 1000 == 0:
                     print '\rPorcessed %s, %s added' % (i, added),   
                 i += 1         
     return anos_list, np.asarray(rsa_data)
+    
+def save_data(anos_list, rsa_data, anos_file_path, rsas_file_path):
+    with open(rsas_file_path, 'wb') as f:
+        np.savez(f, rsa_data)
+    with open(anos_file_path, 'wb') as f:
+        pickle.dump(anos_list, f)    
+    
+def load_data(anos_file_path, rsas_file_path):
+    with open(anos_file_path, 'r') as f:
+        anos = pickle.load(f)    
+    npzfile = np.load(rsas_file_path)
+    rsas = npzfile['arr_0'] 
+    return anos, rsas
+    
+    
+def plot_2d(gps_rsas):
+    plt.plot(gps_rsas[:,1], gps_rsas[:,0], '.')
+    plt.ylim((np.min(gps_rsas[:,0]),np.max(gps_rsas[:,0])))
+   
+def plot_3d(rsas, azimuth=-160, elevation=60):
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    #ax.auto_scale_xyz([np.min(rsas[:,1]),np.max(rsas[:,1])], [np.min(rsas[:,0]),np.max(rsas[:,0])], [np.min(rsas[:,2]),np.max(rsas[:,2])])
+    plt.xlim((np.min(rsas[:,1])-5,np.max(rsas[:,1])+5))
+    plt.ylim((np.min(rsas[:,0])-1,np.max(rsas[:,0])+1))
+    #ax.scatter(rsas[:,1], rsas[:,0], np.zeros(rsas[:,2].shape), c='b', marker='.')
+    ax.scatter(rsas[:,1], rsas[:,0], rsas[:,2], c='b', marker='.')
+    ax.set_xlabel('Longiture')
+    ax.set_ylabel('Latitude')
+    ax.set_zlabel('Age')
+    ax.azim = azimuth
+    ax.elev = elevation   
+    plt.show()
     
 # ##########################################
 # Global variables
@@ -134,20 +180,14 @@ def get_data(ano_file_path, rsa_file_path, ano_format, rsa_format, cp_list, gps_
 cp_list, gps_array = load_cp_gps(cp_file_path, gps_file_path)
 
 # Checking the gps values :)
-plt.plot(gps_array[:,1], gps_array[:,0], '.')
-plt.ylim((np.min(gps_array[:,0]),np.max(gps_array[:,0])))
+plot_2d(gps_array)
 
-anos_list, rsa_data = get_data(big_ano_file_path, big_rsa_file_path, formats.ano_2009_format, formats.rsa_2009_format, cp_list, gps_array)
+anos_list, rsa_data = get_data(short_ano_file_path, short_rsa_file_path, formats.ano_2009_format, formats.rsa_2009_format, cp_list, gps_array)
 
-plt.plot(rsa_data[:,1], rsa_data[:,0], '.')
-plt.ylim((np.min(rsa_data[:,0]),np.max(rsa_data[:,0])))
+plot_2d(rsa_data)
 
+anos, rsas = load_data(anos_file_path, rsas_file_path)
 
+plot_2d(rsas)
+plot_3d(rsas)
 
-f = file("rsas.bin","wb")
-np.savez(f, rsa_data)
-f.close()
-
-import pickle
-with open('anos.pickle', 'wb') as f:
-    pickle.dump(anos_list, f)
