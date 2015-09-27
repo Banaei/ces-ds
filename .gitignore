@@ -60,4 +60,5 @@ target/
 
 # Backup files
 .orig
+.pyc
 
