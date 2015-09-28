@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 Created on Sat Sep 26 12:01:18 2015
-
-@author: Alireza
+@author: Alireza BANAEI
 """
 
 import numpy as np
@@ -12,7 +11,6 @@ import matplotlib.pyplot as plt
 import formats
 from random import randint    
 import pickle
-import pylab
 from sklearn.cluster import KMeans
 from mpl_toolkits.mplot3d import Axes3D
 
@@ -42,7 +40,7 @@ def load_cp_gps(f_cp, f_gps):
     """
     This functions loads postal codes and their corresponding gps coordinates
     from f_cp et f_gps respectively. It returns the list of postal codes (String)
-    and an n x 2 array of gps coordinates
+    and an n x 2 array of gps coordinates [latitude, longitude]
     """
     gps = genfromtxt(f_gps, delimiter=';')
     with open(cp_file_path, 'r') as f:
@@ -51,7 +49,7 @@ def load_cp_gps(f_cp, f_gps):
     cp_list = reduce(lambda x,y: x+y,cp_list)
 
     # Deleting nan values from gps and also corresponding poste codes
-    # Usind reverse sorted to delete the list elements by the end
+    # Usind reverse sorted to delete the list elements by the end to avoid list.del() problem
     indexes_to_delete = sorted(np.arange(gps.shape[0])[np.any(np.isnan(gps), axis=1)], reverse=True)
     for i in indexes_to_delete:
         del cp_list[i]
@@ -65,13 +63,20 @@ def load_cp_gps(f_cp, f_gps):
 
     return cp_list, gps
     
+    
 def is_rsa_ok(line, rsa_format):
-    mode_sortie_dc = 1 * (line[rsa_format['mode_sortie_sp'] - 1:rsa_format['mode_sortie_ep']].strip() == formats.dead_patient_code)
+    """
+    RSA stands for Resume de Sortie Anonyme (Anonymous Record of Stay) which contains a set of patient's data
+    Rejecting all records with error (having CMD 90)
+    """
     cmd_90 = 1 * (line[rsa_format['cmd_sp'] - 1:rsa_format['cmd_ep']].strip() == formats.cmd_90_code)
-    cmd_28 = 1 * (line[rsa_format['cmd_sp'] - 1:rsa_format['cmd_ep']].strip() == formats.cmd_28_code)
-    return mode_sortie_dc + cmd_90 + cmd_28 == 0
+    return cmd_90 == 0
 
 def is_ano_ok(line, ano_format):
+    """
+    Ano stands for anonymisation and corresponds to the anonymous id of each patient
+    Rejecting all records having an error_code (code_retour) different form 0.
+    """
     try:
         result = int(line[ano_format['code_retour_sp'] - 1:ano_format['code_retour_ep']]) == 0
     except ValueError:
@@ -79,6 +84,9 @@ def is_ano_ok(line, ano_format):
     return result
 
 def get_age_in_rsa(line, rsa_format):
+    """
+    Returns the age of the patient in years
+    """
     try:
         age_in_year = int(line[rsa_format['age_in_year_sp'] - 1:rsa_format['age_in_year_ep']]) / formats.age_in_year_class_width
     except ValueError:
@@ -86,11 +94,18 @@ def get_age_in_rsa(line, rsa_format):
     return age_in_year
     
 def get_gps_from_rsa(line, rsa_format, cp_list, gps_array):
+    """
+    finds the GPS coordinates of the postal code of the patient's place (home)
+    """
     code_geo = line[rsa_format['code_geo_sp'] - 1:rsa_format['code_geo_ep']].strip()
     index = cp_list.index(code_geo)
     return gps_array[index, :]
 
 def is_rsa_cancer(line, rsa_format):
+    """
+    Returns true if the principal diagnostic (DP) or related diagnostic (DR) of the patient
+    belongs to the cancer category of ICD 10 classification (International Classification of Diseases)
+    """
     dp = line[rsa_format['dp_sp'] - 1:rsa_format['dp_ep']].strip()
     dr = line[rsa_format['dr_sp'] - 1:rsa_format['dr_ep']].strip()
     for code in cancer_codes_first_caracter_1:
@@ -101,26 +116,50 @@ def is_rsa_cancer(line, rsa_format):
     return False
     
 def get_diags_from_rsa(line, rsa_format):
+    """
+    Returns the principal diagnosis (DP) and related diagnosis (DR) of the patient
+    """
     dp = line[rsa_format['dp_sp'] - 1:rsa_format['dp_ep']].strip()
     dr = line[rsa_format['dr_sp'] - 1:rsa_format['dr_ep']].strip()
     return [dp, dr]
 
     
 def is_rsa_code_geo_in_cp_list(line, rsa_format, cp_list):
+    """
+    Returns true if the postal code of the patient is found among our data base, False otherwise
+    """
     code_geo = line[rsa_format['code_geo_sp'] - 1:rsa_format['code_geo_ep']].strip()
     return code_geo in cp_list
     
 def get_ano(line, ano_format):
+    """
+    Returns the anonymous identifier of the patient
+    """
     return line[ano_format['ano_sp'] - 1:ano_format['ano_ep']]
 
 def is_ano_in_the_list(ano, the_list):
+    """
+    Checks if the ano (anonymous identifier) is in the list of anos
+    """
     try:
         the_list.index(ano)
         return 1
     except ValueError:
         return 0
         
-def get_data(ano_file_path, rsa_file_path, ano_format, rsa_format, cp_list, gps_array):
+def get_data(ano_file_path, rsa_file_path, ano_format, rsa_format, cp_list, gps_array, proportion):
+    """
+    This function reads the ano and rsa files in parallel and extracts
+    - latitude,
+    - longitude,
+    - age
+    - principal diagnosis
+    - related diagnosis
+    form the RSA (records) file. It skips all records having any king of problem (error, postal code not in our database), records not
+    correspondign to cancer, and patients already included (avoiding duplicates).
+    It returns an array (first returned value) having 3 features (latitude, longitude, age) and a list (second returned value) of couples (dp, dr)
+    Important : Only a proportion of data (=proportion) is selected for avoinding too big data
+    """
     rsa_data = list()
     anos_list = list()
     diags_list = list()
@@ -150,12 +189,18 @@ def get_data(ano_file_path, rsa_file_path, ano_format, rsa_format, cp_list, gps_
     return np.asarray(rsa_data), diags_list
     
 def save_data(diags_list, rsa_data, diags_file_path, rsas_file_path):
+    """
+    Saves diags_list and rsa_data into files (npz and pickle respectively)
+    """
     with open(rsas_file_path, 'wb') as f:
         np.savez(f, rsa_data)
     with open(diags_file_path, 'wb') as f:
         pickle.dump(diags_list, f)    
     
 def load_data(diags_file_path, rsas_file_path):
+    """
+    Loads diags_list and rsa_data from files (npz and pickle respectively)
+    """
     with open(diags_file_path, 'r') as f:
         diags = pickle.load(f)    
     npzfile = np.load(rsas_file_path)
@@ -164,10 +209,16 @@ def load_data(diags_file_path, rsas_file_path):
     
     
 def plot_2d(gps_rsas):
+    """
+    Draws a 2-d plot of GPS coordinates (here the French map)
+    """
     plt.plot(gps_rsas[:,1], gps_rsas[:,0], '.')
     plt.ylim((np.min(gps_rsas[:,0]),np.max(gps_rsas[:,0])))
    
 def plot_3d(rsas, azimuth=-160, elevation=60):
+    """
+    Draws a 3-d plot of data points with x-axis as longitude, y-axis as latitude and z-axis as age (in years)
+    """
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
     plt.xlim((np.min(rsas[:,1])-5,np.max(rsas[:,1])+5))
@@ -181,61 +232,30 @@ def plot_3d(rsas, azimuth=-160, elevation=60):
     plt.show()
 
 
-def fetch_data(origin='short'):
+def fetch_data(origin='short', proportion):
+    """
+    Utilitary function for switching between the main big files ans a short set of files (for dev purposes)
+    """
     if (origin=='short'):
         rsa_file = short_rsa_file_path
         ano_file = short_ano_file_path
     else:
         rsa_file = big_rsa_file_path
         ano_file = big_ano_file_path        
-    return get_data(ano_file, rsa_file, formats.ano_2009_format, formats.rsa_2009_format, cp_list, gps_array)
-
-def make_lat_and_long_greed(rsas):
-    latitudes = rsas[:,0]
-    longitudes = rsas[:,1]
-    grid_latitude = np.arange(np.min(latitudes), np.max(latitudes), (np.max(latitudes)-np.min(latitudes))/100)
-    grid_longitude = np.arange(np.min(longitudes), np.max(longitudes), (np.max(longitudes)-np.min(longitudes))/100)
-    min_len = np.min([len(grid_latitude), len(grid_longitude)])
-    grid_latitude = grid_latitude[0:min_len]
-    grid_longitude = grid_longitude[0:min_len]
-    return grid_latitude, grid_longitude
-
-def find_position_in_gps_grid(the_point, grid_latitude, grid_longitude):
-    x = np.nonzero(grid_latitude<=the_point[0])[0]
-    lat_position = np.max([0, x[len(x)-1]])
-    x = np.nonzero(grid_longitude<=the_point[1])[0]
-    long_position = np.max([0, x[len(x)-1]])
-    return lat_position, long_position
-    
-def make_2d_greed(rsas):
-    grid_latitude, grid_longitude = make_lat_and_long_greed(rsas)
-    XY = np.zeros((len(grid_latitude), len(grid_longitude)))
-    for x in rsas:
-        latitude, longitude = find_position_in_gps_grid(x[0:2], grid_latitude, grid_longitude)
-        XY[latitude, longitude] += 1
-    return XY
-
-def groupe_data(rsas):
-    grid_latitude, grid_longitude = make_lat_and_long_greed(rsas)
-    res = list()
-    for x in rsas:
-        latitude, longitude = find_position_in_gps_grid(x[0:2], grid_latitude, grid_longitude)
-        res.append([grid_latitude[latitude], grid_longitude[longitude], x[2]])
-    return np.asarray(res)
-    
-def plot_grid_data(rsas):
-    grid_latitude, grid_longitude = make_lat_and_long_greed(rsas)
-    XY = make_2d_greed(rsas)
-    pylab.pcolor(grid_latitude,grid_longitude,XY, vmin=-10)
-    pylab.colorbar()
-    pylab.show() 
+    return get_data(ano_file, rsa_file, formats.ano_2009_format, formats.rsa_2009_format, cp_list, gps_array, proportion)
 
 def estimate_kmeans(rsas, n_clusters=8, n_init=30):
+    """
+    Applies the KMean's algorithme and returns the estimator
+    """
     estimator = KMeans(verbose=1, n_clusters=n_clusters, n_init=n_init)
     estimator.fit(rsas)
     return estimator
     
 def plot_3d_estimated(rsas, estimator, elev=48, azim=-160):
+    """
+    Scatters the points in 3d with different colors per label
+    """
     fig = plt.figure(figsize=(8, 6))
     plt.clf()
     ax = Axes3D(fig, rect=[0, 0, .95, 1], elev=elev, azim=azim)
@@ -253,7 +273,7 @@ def plot_3d_estimated(rsas, estimator, elev=48, azim=-160):
 # Main part
 # ##########################################
 
-# cp_list : list of postal codes having gps coordinates
+# cp_list : list of postal codes - gps coordinates
 # gps_array : nx2 array containing latitude and longitude of postal codes of cp_list (in order)
 cp_list, gps_array = load_cp_gps(cp_file_path, gps_file_path)
 
@@ -261,12 +281,12 @@ cp_list, gps_array = load_cp_gps(cp_file_path, gps_file_path)
 plot_2d(gps_array)
 
 # For getting data from data files. Used once and save the generated data into files
-rsa_data, diags_list = fetch_data(origin='big')
+rsa_data, diags_list = fetch_data(origin='big', proportion)
 save_data(diags_list, rsa_data, diags_file_path, rsas_file_path)
 
 # Loading saved data
 rsas, diags = load_data(diags_file_path, rsas_file_path)
-plot_grid_data(rsas)
+plot_2d(rsas[0:2])
 
 est = estimate_kmeans(rsas)
 plot_3d_estimated(rsas,est, elev=45)
