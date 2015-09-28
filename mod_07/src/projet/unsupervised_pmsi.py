@@ -12,6 +12,9 @@ import matplotlib.pyplot as plt
 import formats
 from random import randint    
 import pickle
+import pylab
+from sklearn.cluster import KMeans
+from mpl_toolkits.mplot3d import Axes3D
 
     
 # ##########################################
@@ -167,10 +170,8 @@ def plot_2d(gps_rsas):
 def plot_3d(rsas, azimuth=-160, elevation=60):
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
-    #ax.auto_scale_xyz([np.min(rsas[:,1]),np.max(rsas[:,1])], [np.min(rsas[:,0]),np.max(rsas[:,0])], [np.min(rsas[:,2]),np.max(rsas[:,2])])
     plt.xlim((np.min(rsas[:,1])-5,np.max(rsas[:,1])+5))
     plt.ylim((np.min(rsas[:,0])-1,np.max(rsas[:,0])+1))
-    #ax.scatter(rsas[:,1], rsas[:,0], np.zeros(rsas[:,2].shape), c='b', marker='.')
     ax.scatter(rsas[:,1], rsas[:,0], rsas[:,2], c='b', marker='.')
     ax.set_xlabel('Longiture')
     ax.set_ylabel('Latitude')
@@ -178,24 +179,150 @@ def plot_3d(rsas, azimuth=-160, elevation=60):
     ax.azim = azimuth
     ax.elev = elevation   
     plt.show()
+
+
+def fetch_data(origin='short'):
+    if (origin=='short'):
+        rsa_file = short_rsa_file_path
+        ano_file = short_ano_file_path
+    else:
+        rsa_file = big_rsa_file_path
+        ano_file = big_ano_file_path        
+    return get_data(ano_file, rsa_file, formats.ano_2009_format, formats.rsa_2009_format, cp_list, gps_array)
+
+def make_lat_and_long_greed(rsas):
+    latitudes = rsas[:,0]
+    longitudes = rsas[:,1]
+    grid_latitude = np.arange(np.min(latitudes), np.max(latitudes), (np.max(latitudes)-np.min(latitudes))/100)
+    grid_longitude = np.arange(np.min(longitudes), np.max(longitudes), (np.max(longitudes)-np.min(longitudes))/100)
+    min_len = np.min([len(grid_latitude), len(grid_longitude)])
+    grid_latitude = grid_latitude[0:min_len]
+    grid_longitude = grid_longitude[0:min_len]
+    return grid_latitude, grid_longitude
+
+def find_position_in_gps_grid(the_point, grid_latitude, grid_longitude):
+    x = np.nonzero(grid_latitude<=the_point[0])[0]
+    lat_position = np.max([0, x[len(x)-1]])
+    x = np.nonzero(grid_longitude<=the_point[1])[0]
+    long_position = np.max([0, x[len(x)-1]])
+    return lat_position, long_position
+    
+def make_2d_greed(rsas):
+    grid_latitude, grid_longitude = make_lat_and_long_greed(rsas)
+    XY = np.zeros((len(grid_latitude), len(grid_longitude)))
+    for x in rsas:
+        latitude, longitude = find_position_in_gps_grid(x[0:2], grid_latitude, grid_longitude)
+        XY[latitude, longitude] += 1
+    return XY
+
+def groupe_data(rsas):
+    grid_latitude, grid_longitude = make_lat_and_long_greed(rsas)
+    res = list()
+    for x in rsas:
+        latitude, longitude = find_position_in_gps_grid(x[0:2], grid_latitude, grid_longitude)
+        res.append([grid_latitude[latitude], grid_longitude[longitude], x[2]])
+    return np.asarray(res)
+    
+def plot_grid_data(rsas):
+    grid_latitude, grid_longitude = make_lat_and_long_greed(rsas)
+    XY = make_2d_greed(rsas)
+    pylab.pcolor(grid_latitude,grid_longitude,XY, vmin=-10)
+    pylab.colorbar()
+    pylab.show() 
+
+def estimate_kmeans(rsas):
+    estimator = KMeans(verbose=1)
+    estimator.fit(rsas)
+    return estimator
+    
+def plot_3d_estimated(rsas, estimator, elev=48, azim=-160):
+    fig = plt.figure(figsize=(8, 6))
+    plt.clf()
+    ax = Axes3D(fig, rect=[0, 0, .95, 1], elev=elev, azim=azim)
+    plt.cla()
+    labels = estimator.labels_
+    ax.scatter(rsas[:, 1], rsas[:, 0], rsas[:, 2], c=labels.astype(np.float))
+    ax.w_xaxis.set_ticklabels([])
+    ax.w_yaxis.set_ticklabels([])
+    ax.w_zaxis.set_ticklabels([])
+    ax.set_xlabel('Longitude')
+    ax.set_ylabel('Latitude')
+    ax.set_zlabel('Cancer cases')    
     
 # ##########################################
-# Global variables
+# Main part
 # ##########################################
 
 # cp_list : list of postal codes having gps coordinates
 # gps_array : nx2 array containing latitude and longitude of postal codes of cp_list (in order)
 cp_list, gps_array = load_cp_gps(cp_file_path, gps_file_path)
 
-# Checking the gps values :)
+# Checking the gps values
 plot_2d(gps_array)
 
-rsa_data, diags_list = get_data(big_ano_file_path, big_rsa_file_path, formats.ano_2009_format, formats.rsa_2009_format, cp_list, gps_array)
+# For getting data from data files. Used once and save the generated data into files
+rsa_data, diags_list = fetch_data(origin='big')
 save_data(diags_list, rsa_data, diags_file_path, rsas_file_path)
-plot_2d(rsa_data)
 
+# Loading saved data
 rsas, diags = load_data(diags_file_path, rsas_file_path)
+plot_grid_data(rsas)
 
-plot_2d(rsas)
-plot_3d(rsas)
 
+grouped_rsas = groupe_data(rsas)
+est = estimate_kmeans(grouped_rsas)
+plot_3d_estimated(grouped_rsas,est, elev=48)
+
+labels = est.labels_
+grouped_rsas[labels==0,:]
+plot_3d(grouped_rsas[labels<3,:], elevation=90)
+
+
+
+
+
+
+
+
+
+
+
+#
+#
+#from sklearn.decomposition import PCA
+#h=1
+#
+#reduced_data = PCA(n_components=3).fit_transform(greed)
+#kmeans = KMeans(init='k-means++', n_clusters=10, n_init=10)
+#kmeans.fit(reduced_data)
+#x_min, x_max = reduced_data[:, 0].min() + 1, reduced_data[:, 0].max() - 1
+#y_min, y_max = reduced_data[:, 1].min() + 1, reduced_data[:, 1].max() - 1
+#z_min, z_max = reduced_data[:, 2].min() + 1, reduced_data[:, 2].max() - 1
+#
+#xx, yy = np.meshgrid(np.arange(x_min, x_max, h), np.arange(y_min, y_max, h))
+#Z = kmeans.predict(np.c_[xx.ravel(), yy.ravel()])
+#Z = Z.reshape(xx.shape)
+#plt.figure(1)
+#plt.clf()
+#plt.imshow(Z, interpolation='nearest',
+#           extent=(xx.min(), xx.max(), yy.min(), yy.max()),
+#           cmap=plt.cm.Paired,
+#           aspect='auto', origin='lower')
+#
+#plt.plot(reduced_data[:, 0], reduced_data[:, 1], 'k.', markersize=2)
+## Plot the centroids as a white X
+#centroids = kmeans.cluster_centers_
+#plt.scatter(centroids[:, 0], centroids[:, 1],
+#            marker='x', s=169, linewidths=3,
+#            color='w', zorder=10)
+#plt.title('K-means clustering on the digits dataset (PCA-reduced data)\n'
+#          'Centroids are marked with white cross')
+#plt.xlim(x_min, x_max)
+#plt.ylim(y_min, y_max)
+#plt.xticks(())
+#plt.yticks(())
+#plt.show()
+#
+#
+#
+#
