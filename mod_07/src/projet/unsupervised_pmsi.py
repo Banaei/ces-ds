@@ -242,12 +242,12 @@ def plot_3d_estimated(rsas, estimator, elev=48, azim=-160):
     plt.cla()
     labels = estimator.labels_
     ax.scatter(rsas[:, 1], rsas[:, 0], rsas[:, 2], c=labels.astype(np.float))
-    ax.w_xaxis.set_ticklabels([])
-    ax.w_yaxis.set_ticklabels([])
-    ax.w_zaxis.set_ticklabels([])
+#    ax.w_xaxis.set_ticklabels([])
+#    ax.w_yaxis.set_ticklabels([])
+#    ax.w_zaxis.set_ticklabels([])
     ax.set_xlabel('Longitude')
     ax.set_ylabel('Latitude')
-    ax.set_zlabel('Cancer cases')    
+    ax.set_zlabel('Age')    
     
 # ##########################################
 # Main part
@@ -270,16 +270,28 @@ plot_grid_data(rsas)
 
 
 grouped_rsas = groupe_data(rsas)
-est = estimate_kmeans(grouped_rsas)
-plot_3d_estimated(grouped_rsas,est, elev=48)
+est = estimate_kmeans(rsas)
+plot_3d_estimated(rsas,est, elev=45)
+rsas[:,2]=0
+plot_3d(est.cluster_centers_, elevation=45)
+
 
 labels = est.labels_
 grouped_rsas[labels==0,:]
-plot_3d(grouped_rsas[labels<3,:], elevation=90)
+plot_3d(grouped_rsas[labels<3,:], elevation=45)
 
 
+estimator = KMeans(verbose=1)
+estimator.fit(rsas)
+estimator.cluster_centers_
 
 
+fig = plt.figure(figsize=(8, 6))
+plt.clf()
+ax = Axes3D(fig, rect=[0, 0, .95, 1], elev=90, azim=-160)
+plt.cla()
+labels = estimator.labels_
+ax.scatter(rsas[:, 1], rsas[:, 0], np.zeros((rsas.shape[0],1)), c=np.ones(labels.astype(np.float).shape))
 
 
 
