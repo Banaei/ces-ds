@@ -232,7 +232,7 @@ def plot_3d(rsas, azimuth=-160, elevation=60):
     plt.show()
 
 
-def fetch_data(origin='short', proportion):
+def fetch_data(proportion, origin='short'):
     """
     Utilitary function for switching between the main big files ans a short set of files (for dev purposes)
     """
@@ -246,11 +246,22 @@ def fetch_data(origin='short', proportion):
 
 def estimate_kmeans(rsas, n_clusters=8, n_init=30):
     """
-    Applies the KMean's algorithme and returns the estimator
+    Applies the KMean's algorithme and returns the estimator. Data are at first centered and reduced columnwise
+    to have 0 mean and 1 std.
+    Returned : the estimator, the mean and the std vectors
     """
     estimator = KMeans(verbose=1, n_clusters=n_clusters, n_init=n_init)
-    estimator.fit(rsas)
-    return estimator
+    mu = np.mean(rsas, axis=0)
+    std = np.std(rsas, axis=0)
+    data = (rsas - mu)/std[None,:]
+    estimator.fit(data)
+    return estimator, mu, std
+    
+def get_expanded_centroids(cluster_centers, mu):
+    """
+    Expands the centers from 0-mean to mu-mean 
+    """
+    return (cluster_centers*std) + mu
     
 def plot_3d_estimated(rsas, estimator, elev=48, azim=-160):
     """
@@ -268,11 +279,15 @@ def plot_3d_estimated(rsas, estimator, elev=48, azim=-160):
     ax.set_xlabel('Longitude')
     ax.set_ylabel('Latitude')
     ax.set_zlabel('Age')    
-    
+  
+
+  
 # ##########################################
 # Main part
 # ##########################################
 
+
+# ##################  Data preparation section  ###############################
 # cp_list : list of postal codes - gps coordinates
 # gps_array : nx2 array containing latitude and longitude of postal codes of cp_list (in order)
 cp_list, gps_array = load_cp_gps(cp_file_path, gps_file_path)
@@ -281,13 +296,27 @@ cp_list, gps_array = load_cp_gps(cp_file_path, gps_file_path)
 plot_2d(gps_array)
 
 # For getting data from data files. Used once and save the generated data into files
-rsa_data, diags_list = fetch_data(origin='big', proportion)
+rsa_data, diags_list = fetch_data(proportion, origin='big')
 save_data(diags_list, rsa_data, diags_file_path, rsas_file_path)
+
+# ############       End of data preparation section        ###################
+
+
 
 # Loading saved data
 rsas, diags = load_data(diags_file_path, rsas_file_path)
 plot_2d(rsas[0:2])
 
-est = estimate_kmeans(rsas)
+est, mu, std = estimate_kmeans(rsas, n_clusters=5)
 plot_3d_estimated(rsas,est, elev=45)
-plot_3d(est.cluster_centers_, elevation=45)
+centers = get_expanded_centroids(est.cluster_centers_, mu)
+plot_3d(centers, elevation=45)
+
+
+# ##########################################
+# Testing area
+# ##########################################
+
+mu = np.mean(rsas, axis=0)
+std = np.std(rsas, axis=0)
+data = (rsas - mu)/std[None,:]
