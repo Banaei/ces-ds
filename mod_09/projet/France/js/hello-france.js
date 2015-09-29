@@ -1,9 +1,14 @@
 var w = 600;
 var h = 600;
+var r_max = 20
+var on_mouseover_magnifier = 1.2; 
 var dataset = [];
-var x,y;
+var x,y,pop, col;
+
 
 //Create SVG element
+var title = d3.select("body").append("h1").attr('id','title');
+var test = d3.select("body").append("p").attr('id','test_zone');
 var cor = d3.select("body").append("p").attr('id','gps');
 var svg = d3.select("body")
             .append("svg")
@@ -11,7 +16,7 @@ var svg = d3.select("body")
             .attr("height", h);
 var p = d3.select("body").append("p").attr('id','legende');
 
-d3.tsv("data/france-short.tsv")
+d3.tsv("data/france.tsv")
     .row(function (d, i) {
         return {
             codePostal: d["Postal Code"],
@@ -35,44 +40,62 @@ d3.tsv("data/france-short.tsv")
                     .domain(d3.extent(rows, function(row) { return row.longitude; }))
                     .range([0, w]);
 
-		y = d3.scale.linear()
+        y = d3.scale.linear()
                     .domain(d3.extent(rows, function(row) { return row.latitude; }))
                     .range([0, h]);
-        draw();
+
+        pop = d3.scale.sqrt()
+                    .domain(d3.extent(rows, function(row) { return row.population; }))
+                    .range([1, r_max]);
+
+        col = d3.scale.linear()
+                    .domain(d3.extent(rows, function(row) { return row.densite; }))
+                    .range(['blue', 'red']);
+        draw(dataset);
     });
 
-function draw() {
-    svg.selectAll("rect")
-        .data(dataset)
+function draw(data) {
+    svg.selectAll("circle").remove();
+    svg.selectAll("circle")
+        .data(data)
         .enter()
-        .append("rect")
-		.attr("width", 1)
-        .attr("height", 1)
-		.attr("x", function(d) { return x(d.longitude); })
-		.attr("y", function(d) { return h-y(d.latitude); })
+        .append("circle")
+		.attr("r", function(d) { return pop(d.population); })
+		.attr("cx", function(d) { return x(d.longitude); })
+		.attr("cy", function(d) { return h-y(d.latitude); })
+        .attr("fill", function(d) { return col(d.densite); })
 		.on("mouseover", highlight)
 		.on("mouseout", unhighlight);
-
-		;
 	}
 
 function highlight(d){
-	d3.select(this)
-	.attr("width", 6)
-	.attr("height", 6)
-	.attr("fill", "red");
 
-	d3.select("#legende")
-	.text(d.place + " Code postal=" + d.codePostal + ", population=" + d.population + ", densité=" + d.densite);
-	
+    d3.select(this)
+    .attr("r", function(d) { return on_mouseover_magnifier*pop(d.population); });
+
+	d3.select(this)
+	.attr("fill", "black");
+
+    d3.select("#title")
+    .text(d.place);
+    
 	d3.select("#gps")
 	.text("longitude=" + d.longitude + ", latitude=" + d.latitude);
+
+    d3.select("#legende")
+    .text(" Code postal=" + d.codePostal + ", population=" + d.population + ", densité=" + d.densite + " ... ");
+    
+ 
 }
 
 function unhighlight(d){
 	d3.select(this)
-	.attr("width", 1)
-	.attr("height", 1)
-	.attr("fill", "black");
+    .attr("r", function(d) { return pop(d.population); })
+    .attr("fill", function(d) { return col(d.densite); });
 }
 
+function on_slide(evt, value) {
+    d3.select('#slider3text').text(value);
+    filtered = dataset.filter(function(d){ return d['population'] > value;});
+    draw(filtered);
+}
