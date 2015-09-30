@@ -1,7 +1,7 @@
 var w = 600;
 var h = 600;
 var r_max = 20
-var on_mouseover_magnifier = 1.2; 
+var on_mouseover_magnifier = 3; 
 var dataset = [];
 var x,y,pop, col;
 
@@ -74,7 +74,7 @@ function highlight(d){
     .attr("r", function(d) { return on_mouseover_magnifier*pop(d.population); });
 
 	d3.select(this)
-	.attr("fill", "black");
+	.attr("fill", "yellow");
 
     d3.select("#title")
     .text(d.place);

@@ -28,7 +28,7 @@ short_rsa_file_path = '../../../../extra_data/pmsi/2009/rsa09_short.txt'
 short_ano_file_path = '../../../../extra_data/pmsi/2009/ano09_short.txt'
 diags_file_path='../../../../extra_data/pmsi/2009/diags.pickle'
 rsas_file_path='../../../../extra_data/pmsi/2009/rsas.npz'
-proportion = 10 # in percent
+proportion = 5 # in percent
 
 
 

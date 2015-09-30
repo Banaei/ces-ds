@@ -34,14 +34,14 @@
 	<body>
 	  	<script type="text/javascript" src="js/hello-france.js"></script>
 
-	    <h2>Slider with slide event: <span id="slider3text">0</span></h2>
+	    <h2>Afficher les villes avec une population > <span id="slider3text">0</span></h2>
 	    <div id="slider3"></div>
 
 
 		<script src="js/d3/d3.v3.min.js"></script>
 		<script src="js/d3/d3.slider.js"></script>
 		<script>
-		    d3.select('#slider3').call(d3.slider().axis(true).min(0).max(1000000).step(10000).on("slide", on_slide));
+		    d3.select('#slider3').call(d3.slider().axis(true).min(0).max(400000).step(10000).on("slide", on_slide));
 	  	</script>
 
 	</body>
