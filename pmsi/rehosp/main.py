@@ -9,11 +9,16 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.externals import joblib
 from sklearn import tree
 import os
-rsa_2009_file_path = '/DS/pmsi/data/2009/rsa09.txt'
-rsa_2010_file_path = '/DS/pmsi/data/2010/rsa10.txt'
-ano_2009_file_path = '/DS/pmsi/data/2009/ano09.txt'
-ano_2010_file_path = '/DS/pmsi/data/2010/ano10t.txt'
-python_data_directory = '../data/python/'
+import imp
+
+imp.reload(formats)
+imp.reload(data_collection)
+
+rsa_2009_file_path = '/DS/extra_data/pmsi/2009/rsa09.txt'
+rsa_2010_file_path = '/DS/extra_data/pmsi/2010/rsa10.txt'
+ano_2009_file_path = '/DS/extra_data/pmsi/2009/ano09.txt'
+ano_2010_file_path = '/DS/extra_data/pmsi/2010/ano10t.txt'
+python_data_directory = '/DS/extra_data/pmsi/python/'
 meta_data_2009_pickle = python_data_directory + 'meta_data_2009.pickle'
 anos_2009_pickle = python_data_directory + 'anos_2009.pickle'
 rsas_2009_data = python_data_directory + 'rsa_2009.npz'
@@ -184,3 +189,11 @@ def save_tree_as_dot_and_pdf(tree_classifier, tree_dot_file_name, tree_pdf_file_
     feature_labels = get_feature_labels()
     tree.export_graphviz(tree_classifier, out_file=tree_dot_file_name, feature_names=feature_labels)
     os.system('dot -Tpdf ' + tree_dot_file_name + '  -o ' + tree_pdf_file_name)
+    
+    
+# ###########################################
+#                   Work area
+# ###########################################
+
+generate_and_save_metadata_2009()
+generate_and_save_clean_data_2009()

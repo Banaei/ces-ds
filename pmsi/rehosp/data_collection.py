@@ -49,8 +49,8 @@ def add_stay_length_cat(line, rsa_format, stay_length_classes):
     except ValueError:
         stay_lentgh = 0
 
-    if stay_lentgh > formats.age_in_day_cols_count - 1:
-        stay_lentgh = formats.age_in_day_cols_count - 1
+    if stay_lentgh > formats.stay_length_cols - 1:
+        stay_lentgh = formats.stay_length_cols - 1
     stay_length_classes[stay_lentgh] += 1
     stay_length_classes[0] = 0
 
@@ -95,7 +95,8 @@ def collect_meta_data(rsa_file_path, rsa_format, ano_file_path, ano_format):
                 if not rsa and not ano:
                     break
 
-    result = {'cmd': list(sorted(cmd_set)),
+    result = {
+     'cmd': list(sorted(cmd_set)),
      'stay_type': list(sorted(stay_type_set)),
      'stay_complexity': list(sorted(stay_complexity_set)),
      'age_in_year_classes': age_in_year_classes,
