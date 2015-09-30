@@ -38,7 +38,7 @@ proportion = 5 # in percent
 
 def load_cp_gps(f_cp, f_gps):
     """
-    This functions loads postal codes and their corresponding gps coordinates
+    This functions loads geographical codes (almost same as postal codes) and their corresponding gps coordinates
     from f_cp et f_gps respectively. It returns the list of postal codes (String)
     and an n x 2 array of gps coordinates [latitude, longitude]
     """
@@ -88,7 +88,7 @@ def get_age_in_rsa(line, rsa_format):
     Returns the age of the patient in years
     """
     try:
-        age_in_year = int(line[rsa_format['age_in_year_sp'] - 1:rsa_format['age_in_year_ep']]) / formats.age_in_year_class_width
+        age_in_year = int(line[rsa_format['age_in_year_sp'] - 1:rsa_format['age_in_year_ep']])
     except ValueError:
         age_in_year = 0
     return age_in_year
@@ -297,6 +297,7 @@ plot_2d(gps_array)
 
 # For getting data from data files. Used once and save the generated data into files
 rsa_data, diags_list = fetch_data(proportion, origin='big')
+# Porcessed 24575000, 182394 added 
 save_data(diags_list, rsa_data, diags_file_path, rsas_file_path)
 
 # ############       End of data preparation section        ###################
@@ -305,7 +306,8 @@ save_data(diags_list, rsa_data, diags_file_path, rsas_file_path)
 
 # Loading saved data
 rsas, diags = load_data(diags_file_path, rsas_file_path)
-plot_2d(rsas[0:2])
+plot_2d(rsas[:,0:2])
+plot_3d(rsas)
 
 est, mu, std = estimate_kmeans(rsas, n_clusters=5)
 plot_3d_estimated(rsas,est, elev=45)
@@ -317,6 +319,5 @@ plot_3d(centers, elevation=45)
 # Testing area
 # ##########################################
 
-mu = np.mean(rsas, axis=0)
-std = np.std(rsas, axis=0)
-data = (rsas - mu)/std[None,:]
+np.mean(rsas, axis=0)
+np.max(rsas, axis=0)
