@@ -135,7 +135,7 @@ def create_data_set():
     print 'Y_data saved to ', Y_data_filename
 
 
-def analyse_and_learn(learning_proportion = 0.01):
+def analyse_and_learn(learning_proportion = 0.01, min_depth = 1, max_depth = 10):
     print 'Loading data ...'
     X_data = load_sparse_csr(X_data_filename)
     print 'X_data loaded'
@@ -152,8 +152,6 @@ def analyse_and_learn(learning_proportion = 0.01):
     Y_learning = Y_data[learning_sample_indexes]
     X_validation = X_data[validation_population_indexes]
     Y_validation = Y_data[validation_population_indexes]
-    min_depth = 5
-    max_depth = 20
     scores = list()
     Y_learning_dense = Y_learning.todense()
     Y_validation_dense = Y_validation.todense()
@@ -164,7 +162,7 @@ def analyse_and_learn(learning_proportion = 0.01):
     print 'Beginning Desicion Tree classification'
     best_score = 0
     best_choice = ()
-    for depth in range(min_depth, max_depth):
+    for depth in range(min_depth, max_depth+1):
         dtc = DecisionTreeClassifier(criterion='gini', max_depth=depth)
         dtc.fit(X_learning, Y_learning_dense)
         learning_score = dtc.score(X_learning, Y_learning.todense())
@@ -195,5 +193,13 @@ def save_tree_as_dot_and_pdf(tree_classifier, tree_dot_file_name, tree_pdf_file_
 #                   Work area
 # ###########################################
 
+# Data gathering and preparation
 generate_and_save_metadata_2009()
 generate_and_save_clean_data_2009()
+# Porcessed 24570000       added 16549439 
+generate_and_save_clean_data_jan_2010()
+create_data_set()
+
+# Data alalysis
+analyse_and_learn(min_depth = 1, max_depth = 3)
+save_tree_as_dot_and_pdf(load_dt_classifier(), dtc_dot_filename, dtc_pdf_filename)
