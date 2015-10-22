@@ -26,8 +26,10 @@ table = connection.table('wiki')
 class WikiSpider(scrapy.Spider):
     
     
-    name = 'wiki'
+    name = 'WikipediaSpider' #identifiant du robot présenté au site crawlé
     start_urls = ['http://localhost']
+    allowed_domains = ['localhost']
+    custom_settings = {"DOWNLOAD_HANDLERS": {"s3": None}} # Pour éviter l'erreur bizarre de démarrage 
     url_count = 0
 
     def parse(self, response):
