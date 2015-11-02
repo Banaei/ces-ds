@@ -271,3 +271,37 @@ plot_grid_data(rsas)
 est = estimate_kmeans(rsas)
 plot_3d_estimated(rsas,est, elev=45)
 plot_3d(est.cluster_centers_, elevation=45)
+
+
+# ##########################################
+#          Finding the elbow
+# ##########################################
+
+from scipy.cluster.vq import kmeans,vq
+from scipy.spatial.distance import cdist
+
+K = range(1,10)
+KM = [kmeans(rsas,k) for k in K]
+centroids = [cent for (cent,var) in KM]   # cluster centroids
+D_k = [cdist(rsas, cent, 'euclidean') for cent in centroids]
+cIdx = [np.argmin(D,axis=1) for D in D_k]
+dist = [np.min(D,axis=1) for D in D_k]
+avgWithinSS = [sum(d)/rsas.shape[0] for d in dist]
+
+
+##### plot ###
+kIdx = 3
+
+# elbow curve
+fig = plt.figure()
+ax = fig.add_subplot(111)
+ax.plot(K, avgWithinSS, 'b*-')
+ax.plot(K[kIdx], avgWithinSS[kIdx], marker='o', markersize=12, markeredgewidth=2, markeredgecolor='r', markerfacecolor='None')
+plt.grid(True)
+plt.xlabel('Number of clusters')
+plt.ylabel('Average within-cluster sum of squares')
+plt.title('Elbow for KMeans clustering')
+
+# ##########################################
+#         End of the elbow
+# ##########################################
