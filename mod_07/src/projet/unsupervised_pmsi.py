@@ -305,3 +305,26 @@ plt.title('Elbow for KMeans clustering')
 # ##########################################
 #         End of the elbow
 # ##########################################
+
+import scipy.cluster.hierarchy as hac
+z = hac.linkage(rsas, method='single')
+
+# Memory error : not adapted to large data
+
+# ##########################################
+#                    GMM
+# ##########################################
+
+from sklearn import mixture
+from sklearn import preprocessing
+
+g = mixture.GMM(n_components=5)
+scaler = preprocessing.StandardScaler().fit(rsas)
+g.fit(scaler.transform(rsas))
+print np.round(scaler.inverse_transform(g.means_), 2)
+p = g.predict(scaler.transform(rsas))
+
+
+
+
+
