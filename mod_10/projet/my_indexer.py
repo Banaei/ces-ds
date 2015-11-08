@@ -1,14 +1,17 @@
 # -*- coding: utf-8 -*-
-"""
-Created on Tue Oct 20 13:54:10 2015
+"""Created on Tue Oct 20 13:54:10 2015
 
 @author: user
 """
 
 import happybase
 import re
+#import stem
 from stemming.porter2 import stem
 import math
+
+
+host= 'localhost'
 
 global_dict = {}
 
@@ -54,7 +57,7 @@ def calculate_idf(total_docs_count):
 
 
    
-connection = happybase.Connection('localhost')
+connection = happybase.Connection(host)
 
 # Deleting the table
 if 'index' in connection.tables():
