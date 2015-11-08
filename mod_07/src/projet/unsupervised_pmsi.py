@@ -248,6 +248,19 @@ def plot_3d_estimated(rsas, estimator, elev=48, azim=-160):
     ax.set_xlabel('Longitude')
     ax.set_ylabel('Latitude')
     ax.set_zlabel('Age')    
+
+
+def calcul_pd(x, y, mean, cov):
+    """
+    Cette fonction calcule la distribution de probabilite de la loi normale a 2 variable pour x et y 
+    avec le vecteur de moyennes "mean" et la matrice de covariance "cov"
+    """
+    x_mean = np.array([x-mean[0], y-mean[1]])
+    cov_inv = inv(cov)
+    x_mean_T = x_mean.T
+    r = math.exp(-0.5 * np.dot(np.dot(x_mean_T, cov_inv), x_mean))
+    return r/math.sqrt(((2*math.pi)**2)*np.linalg.det(cov))
+
     
 # ##########################################
 # Main part
@@ -277,7 +290,7 @@ plot_3d(est.cluster_centers_, elevation=45)
 #          Finding the elbow
 # ##########################################
 
-from scipy.cluster.vq import kmeans,vq
+from scipy.cluster.vq import kmeans
 from scipy.spatial.distance import cdist
 
 K = range(1,10)
@@ -318,13 +331,52 @@ z = hac.linkage(rsas, method='single')
 from sklearn import mixture
 from sklearn import preprocessing
 
-g = mixture.GMM(n_components=5)
+g = mixture.GMM(n_components=5, covariance_type='full')
 scaler = preprocessing.StandardScaler().fit(rsas)
-g.fit(scaler.transform(rsas))
-print np.round(scaler.inverse_transform(g.means_), 2)
+rsas_std = scaler.transform(rsas)
+g.fit(rsas_std)
+means = scaler.inverse_transform(g.means_)
+covars = g.covars_
 p = g.predict(scaler.transform(rsas))
 
+rsas_means = np.mean(rsas, axis=0)
+rsas_std = np.std(rsas, axis=0)
+
+mins = np.min(rsas, axis=0)
+maxs = np.max(rsas, axis=0)
+
+cov = covars[0]
+mean = rsas_means[0]
+fig = plt.figure()
+ax = fig.add_subplot(111, projection='3d')
+x = y = np.arange(-3.0, 3.0, 0.02)
+Xs, Ys = np.meshgrid(x, y)
+zs = np.array([calcul_pd(xx,yy, mean, cov) for xx,yy in zip(np.ravel(Xs), np.ravel(Ys))])
+Zs = zs.reshape(Xs.shape)
+ax.plot_surface(Xs, Ys, Zs)
+ax.set_xlabel('X1')
+ax.set_ylabel('X2')
+ax.set_zlabel('P')
+ax.view_init(elev=30., azim=120)
+plt.show()
+
+if (cov == cov.T).all():
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    x = y = np.arange(-3.0, 3.0, 0.02)
+    Xs, Ys = np.meshgrid(x, y)
+    zs = np.array([calcul_pd(xx,yy, mean, cov) for xx,yy in zip(np.ravel(Xs), np.ravel(Ys))])
+    Zs = zs.reshape(Xs.shape)
+    ax.plot_surface(Xs, Ys, Zs)
+    ax.set_xlabel('X1')
+    ax.set_ylabel('X2')
+    ax.set_zlabel('P')
+    ax.view_init(elev=30., azim=120)
+    plt.show()
+else:
+    print 'Erreur : Matrice de covariance symetriques'
 
 
 
+cov * (rsas_std * rsas_std)
 
