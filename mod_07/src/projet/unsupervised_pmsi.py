@@ -15,7 +15,10 @@ import pickle
 import pylab
 from sklearn.cluster import KMeans
 from mpl_toolkits.mplot3d import Axes3D
-
+from sklearn import mixture
+from sklearn import preprocessing
+from scipy.cluster.vq import kmeans
+from scipy.spatial.distance import cdist
     
 # ##########################################
 # Constants
@@ -290,10 +293,9 @@ plot_3d(est.cluster_centers_, elevation=45)
 #          Finding the elbow
 # ##########################################
 
-from scipy.cluster.vq import kmeans
-from scipy.spatial.distance import cdist
 
-K = range(1,10)
+
+K = range(1,20)
 KM = [kmeans(rsas,k) for k in K]
 centroids = [cent for (cent,var) in KM]   # cluster centroids
 D_k = [cdist(rsas, cent, 'euclidean') for cent in centroids]
@@ -303,13 +305,13 @@ avgWithinSS = [sum(d)/rsas.shape[0] for d in dist]
 
 
 ##### plot ###
-kIdx = 3
+# kIdx = 3
 
 # elbow curve
 fig = plt.figure()
 ax = fig.add_subplot(111)
-ax.plot(K, avgWithinSS, 'b*-')
-ax.plot(K[kIdx], avgWithinSS[kIdx], marker='o', markersize=12, markeredgewidth=2, markeredgecolor='r', markerfacecolor='None')
+ax.plot(K[0:5], avgWithinSS[0:5], 'b*-')
+# ax.plot(K[kIdx], avgWithinSS[kIdx], marker='o', markersize=12, markeredgewidth=2, markeredgecolor='r', markerfacecolor='None')
 plt.grid(True)
 plt.xlabel('Number of clusters')
 plt.ylabel('Average within-cluster sum of squares')
@@ -327,56 +329,40 @@ z = hac.linkage(rsas, method='single')
 # ##########################################
 #                    GMM
 # ##########################################
+K = range(1,21)
+KGMM = [mixture.GMM(n_components=k, covariance_type='diag').fit(rsas) for k in K]
 
-from sklearn import mixture
-from sklearn import preprocessing
+avgWithinSS = list()
+bic = []
+for kgmm in KGMM:
+    labels = kgmm.predict(rsas)
+    means = kgmm.means_
+    bic.append(kgmm.bic(rsas))
+    D_K = [cdist(rsas[labels==l],means[l,:][np.newaxis, :]) for l in range(means.shape[0])]
+    avgWithinSS.append(np.mean([np.mean(D) for D in D_K]))
 
-g = mixture.GMM(n_components=5, covariance_type='full')
-scaler = preprocessing.StandardScaler().fit(rsas)
-rsas_std = scaler.transform(rsas)
-g.fit(rsas_std)
-means = scaler.inverse_transform(g.means_)
-covars = g.covars_
-p = g.predict(scaler.transform(rsas))
+plt.plot(bic)
+# elbow curve
+# kIdx = 3
 
-rsas_means = np.mean(rsas, axis=0)
-rsas_std = np.std(rsas, axis=0)
-
-mins = np.min(rsas, axis=0)
-maxs = np.max(rsas, axis=0)
-
-cov = covars[0]
-mean = rsas_means[0]
 fig = plt.figure()
-ax = fig.add_subplot(111, projection='3d')
-x = y = np.arange(-3.0, 3.0, 0.02)
-Xs, Ys = np.meshgrid(x, y)
-zs = np.array([calcul_pd(xx,yy, mean, cov) for xx,yy in zip(np.ravel(Xs), np.ravel(Ys))])
-Zs = zs.reshape(Xs.shape)
-ax.plot_surface(Xs, Ys, Zs)
-ax.set_xlabel('X1')
-ax.set_ylabel('X2')
-ax.set_zlabel('P')
-ax.view_init(elev=30., azim=120)
-plt.show()
+ax = fig.add_subplot(111)
+ax.plot(K, avgWithinSS, 'b*-')
+# ax.plot(K[kIdx], avgWithinSS[kIdx], marker='o', markersize=12, markeredgewidth=2, markeredgecolor='r', markerfacecolor='None')
+plt.grid(True)
+plt.xlabel('Number of clusters')
+plt.ylabel('Average within-cluster distancess the mean point')
+plt.title('Elbow for GMM clustering')
 
-if (cov == cov.T).all():
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
-    x = y = np.arange(-3.0, 3.0, 0.02)
-    Xs, Ys = np.meshgrid(x, y)
-    zs = np.array([calcul_pd(xx,yy, mean, cov) for xx,yy in zip(np.ravel(Xs), np.ravel(Ys))])
-    Zs = zs.reshape(Xs.shape)
-    ax.plot_surface(Xs, Ys, Zs)
-    ax.set_xlabel('X1')
-    ax.set_ylabel('X2')
-    ax.set_zlabel('P')
-    ax.view_init(elev=30., azim=120)
-    plt.show()
-else:
-    print 'Erreur : Matrice de covariance symetriques'
+centers_k_4 = KGMM[3].means_ * [1, 1, 5]
+centers_k_19 = KGMM[18].means_ * [1, 1, 5]
+
+france = np.c_[gps_array, np.zeros(gps_array.shape[0])]
+
+plot_3d(france)
+plot_3d(centers_k_4)
+plot_3d(centers_k_19)
 
 
 
-cov * (rsas_std * rsas_std)
 
