@@ -10,15 +10,24 @@ import re
 from stemming.porter2 import stem
 import math
 
+# ******************************************************************
+#              Parameters & initialization
+# ******************************************************************
+
 
 host= 'localhost'
+wiki_table_name = 'wiki'
+index_table_name = 'table'
 
 global_dict = {}
-
 stopwords_list = list()
 with open('stop_words.txt', 'r') as stop_words_file:
     for line in stop_words_file:
         stopwords_list.append(line)
+        
+# ******************************************************************
+#              Functions
+# ******************************************************************
         
 def is_word_ok(word):
     return (word not in stopwords_list)
@@ -56,53 +65,95 @@ def calculate_idf(total_docs_count):
             d[url_key] = str(d[url_key]*idf).encode('utf-8')
 
 
+# ******************************************************************
+#              Database connection and initialization
+# ******************************************************************
+
    
 connection = happybase.Connection(host)
 
-# Deleting the table
-if 'index' in connection.tables():
-    connection.delete_table('index', disable=True)
+# Deleting the table if it exists
+if index_table_name in connection.tables():
+    connection.delete_table(index_table_name, disable=True)
 
 # Create the test table, with a column family
-connection.create_table('index', {'cf':{}})
+connection.create_table(index_table_name, {'cf':{}})
 
-# Openning the table
-index_table = connection.table('index')
-wiki_table = connection.table('wiki')
+# Openning the tables
+index_table = connection.table(index_table_name)
+wiki_table = connection.table(wiki_table_name)
 
+
+# ******************************************************************
+#              Creating indexes on words
+# ******************************************************************
 
 
 i = -1
 total_docs_count = 0
 for key, data in wiki_table.scan():
     i += 1
+    if (i%100==0):
+        print  i,
     words_in_doc = 0
     total_docs_count += 1
-    if i==1000:
-        break
+#    if i==1000:
+#        break
     it = re.finditer(r"\w+",data['cf:content'].decode('utf-8'),re.UNICODE)
     for word_match in it:
-        if (is_word_ok(word_match)):
+        s = stem(word_match.group()).lower()
+        if (is_word_ok(s)):
             words_in_doc += 1
-            s = stem(word_match.group())
             add_to_global_dict(s, key)
-            print "WORD=", word_match.group()
-            print "STEM=", s
     calculate_tf_for_doc(key, words_in_doc)
-    if i==3:
-        break
+
 calculate_idf(total_docs_count)
 
 
-for k in global_dict:
-    print '*********************************************************'
-    print k, global_dict[k]
+# ******************************************************************
+#              Saving into HBase
+# ******************************************************************
 
 with index_table.batch() as b:
     for k in global_dict:
         try:
-            print global_dict[k]
-            b.put(k, global_dict[k])
+            b.put(k.encode('utf-8'), global_dict[k])
         except TypeError:
             print "Error catched !"
     b.send()
+
+
+
+# *******************************************************
+#                        Interrogation
+# *******************************************************
+
+connection = happybase.Connection(host)
+index_table = connection.table(index_table_name)
+
+#query = raw_input("Entrez votre query :")
+query = 'Singapore'
+words = query.split()
+for word in words:
+    if (is_word_ok(word)):
+        stemmed_word = stem(word)
+        print stemmed_word
+        row = index_table.row(stemmed_word)
+        print row
+
+#i=0
+#for k, v in index_table.scan():
+#    print k
+#    print v
+#    print '*******************************'
+#    i += 1
+#    if i==2000000:
+#        break
+#    if k=='Catharin':
+#        break
+        
+
+
+
+
+

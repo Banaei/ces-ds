@@ -44,7 +44,8 @@ class WikiSpider(scrapy.Spider):
             href = response.urljoin(href)
             if (href.startswith('http://localhost/articles') and ('%7E' not in href)):
                 self.url_count += 1
-                yield scrapy.Request(href, callback=self.parse)
+                if (self.url_count<100):
+                    yield scrapy.Request(href, callback=self.parse)
                 
                 
     def closed(self, reason):
