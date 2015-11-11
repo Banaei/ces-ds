@@ -17,7 +17,7 @@ import math
 
 host= 'localhost'
 wiki_table_name = 'wiki'
-index_table_name = 'table'
+index_table_name = 'index'
 
 global_dict = {}
 stopwords_list = list()
@@ -88,17 +88,24 @@ wiki_table = connection.table(wiki_table_name)
 #              Creating indexes on words
 # ******************************************************************
 
+i = -1
+key_data = {}
+for key, data in wiki_table.scan():
+    key_data[key]=data
+    i += 1
+    if (i%100==0):
+        print  i,
+
+
 
 i = -1
 total_docs_count = 0
-for key, data in wiki_table.scan():
+for key, data in key_data.items():
     i += 1
     if (i%100==0):
         print  i,
     words_in_doc = 0
     total_docs_count += 1
-#    if i==1000:
-#        break
     it = re.finditer(r"\w+",data['cf:content'].decode('utf-8'),re.UNICODE)
     for word_match in it:
         s = stem(word_match.group()).lower()
