@@ -165,17 +165,9 @@ for word in words:
         stemmed_word = stem(word.lower()).encode('utf-8')
         if (first_loop):
             query_search_results = index_table.row(stemmed_word)
-            print '********************************************************************************'
-            print '********************************************************************************'
-            print stemmed_word
-            print sorted(query_search_results.items(), key=operator.itemgetter(0))
             first_loop = False
         else:
             intermediate_results = index_table.row(stemmed_word)
-            print '********************************************************************************'
-            print '********************************************************************************'
-            print stemmed_word
-            print sorted(intermediate_results.items(), key=operator.itemgetter(0))
             commun_results = {}
             for k, v in query_search_results.items():
                 if (k in intermediate_results):
