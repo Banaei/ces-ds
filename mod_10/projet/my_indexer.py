@@ -9,28 +9,30 @@ import re
 #import stem
 from stemming.porter2 import stem
 import math
+import pickle
+import gzip
 
 # ******************************************************************
 #              Parameters & initialization
 # ******************************************************************
 
 
-host= 'localhost'
+host= '192.168.0.11'
 wiki_table_name = 'wiki'
 index_table_name = 'index'
 
 global_dict = {}
-stopwords_list = list()
+stopwords_list = {}
 with open('stop_words.txt', 'r') as stop_words_file:
     for line in stop_words_file:
-        stopwords_list.append(line)
+        stopwords_list[line.strip()]='1'
         
 # ******************************************************************
 #              Functions
 # ******************************************************************
         
 def is_word_ok(word):
-    return (word not in stopwords_list)
+    return (word.lower() not in stopwords_list)
     
 def update_doc_dict(word, words_dict):
     if (word in words_dict):
@@ -85,82 +87,103 @@ wiki_table = connection.table(wiki_table_name)
 
 
 # ******************************************************************
+#              Getting wiki iindexes in memry
+# ******************************************************************
+# To avoid HBase timeout issues
+wiki_data = {}
+for url, content in wiki_table.scan():
+    wiki_data[url]=content
+
+
+# ******************************************************************
 #              Creating indexes on words
 # ******************************************************************
 
 i = -1
-key_data = {}
-for key, data in wiki_table.scan():
-    key_data[key]=data
-    i += 1
-    if (i%100==0):
-        print  i,
-
-
-
-i = -1
 total_docs_count = 0
-for key, data in key_data.items():
+for key, data in wiki_data.items():
     i += 1
     if (i%100==0):
         print  i,
     words_in_doc = 0
     total_docs_count += 1
-    it = re.finditer(r"\w+",data['cf:content'].decode('utf-8'),re.UNICODE)
+    it = re.finditer(r"\w+",data['cf:content'],re.UNICODE)
     for word_match in it:
-        s = stem(word_match.group()).lower()
+        s = stem(word_match.group().lower())
         if (is_word_ok(s)):
             words_in_doc += 1
             add_to_global_dict(s, key)
     calculate_tf_for_doc(key, words_in_doc)
 
-calculate_idf(total_docs_count)
 
+# ******************************************************************
+#              Saving indexes
+# ******************************************************************
+
+f = gzip.open('global_dict.pklz','wb')
+pickle.dump(global_dict,f)
+f.close()
+
+# ******************************************************************
+#              CAlculating TF_IDF
+# ******************************************************************
+
+calculate_idf(total_docs_count)
 
 # ******************************************************************
 #              Saving into HBase
 # ******************************************************************
 
-with index_table.batch() as b:
-    for k in global_dict:
+i = 0
+with index_table.batch(batch_size=1000) as b:
         try:
-            b.put(k.encode('utf-8'), global_dict[k])
-        except TypeError:
-            print "Error catched !"
-    b.send()
-
-
-
+            for k, v in global_dict.items():
+                i += 1
+                if (i%1000)==0:
+                    print '>> ', i, k, v
+                b.put(k, v)
+        except UnicodeDecodeError:
+            print '>>>>>>>>>>>  UnicodeDecodeError :', i, k, v
+        except :
+            print ">>>>>>>>>>>  Error catched !"
+    
 # *******************************************************
 #                        Interrogation
 # *******************************************************
+import operator            
 
 connection = happybase.Connection(host)
 index_table = connection.table(index_table_name)
 
 #query = raw_input("Entrez votre query :")
-query = 'Singapore'
+query = ' Which associations are both Singapore and Brunei in'
 words = query.split()
+query_search_results = {}
+first_loop = True
 for word in words:
     if (is_word_ok(word)):
-        stemmed_word = stem(word)
-        print stemmed_word
-        row = index_table.row(stemmed_word)
-        print row
+        stemmed_word = stem(word.lower()).encode('utf-8')
+        if (first_loop):
+            query_search_results = index_table.row(stemmed_word)
+            print '********************************************************************************'
+            print '********************************************************************************'
+            print stemmed_word
+            print sorted(query_search_results.items(), key=operator.itemgetter(0))
+            first_loop = False
+        else:
+            intermediate_results = index_table.row(stemmed_word)
+            print '********************************************************************************'
+            print '********************************************************************************'
+            print stemmed_word
+            print sorted(intermediate_results.items(), key=operator.itemgetter(0))
+            commun_results = {}
+            for k, v in query_search_results.items():
+                if (k in intermediate_results):
+                    commun_results[k]=v
+            query_search_results = commun_results
 
-#i=0
-#for k, v in index_table.scan():
-#    print k
-#    print v
-#    print '*******************************'
-#    i += 1
-#    if i==2000000:
-#        break
-#    if k=='Catharin':
-#        break
+sorted_results = sorted(query_search_results.items(), key=operator.itemgetter(1), reverse=True)
+for url, score in sorted_results:
+    print 'URL=%s, TFIDF=%s' %(url[3::], score)
         
-
-
-
-
 
