@@ -125,7 +125,7 @@ pickle.dump(global_dict,f)
 f.close()
 
 # ******************************************************************
-#              CAlculating TF_IDF
+#              Calculating TF_IDF
 # ******************************************************************
 
 calculate_idf(total_docs_count)
@@ -147,35 +147,3 @@ with index_table.batch(batch_size=1000) as b:
         except :
             print ">>>>>>>>>>>  Error catched !"
     
-# *******************************************************
-#                        Interrogation
-# *******************************************************
-import operator            
-
-connection = happybase.Connection(host)
-index_table = connection.table(index_table_name)
-
-#query = raw_input("Entrez votre query :")
-query = ' Which associations are both Singapore and Brunei in'
-words = query.split()
-query_search_results = {}
-first_loop = True
-for word in words:
-    if (is_word_ok(word)):
-        stemmed_word = stem(word.lower()).encode('utf-8')
-        if (first_loop):
-            query_search_results = index_table.row(stemmed_word)
-            first_loop = False
-        else:
-            intermediate_results = index_table.row(stemmed_word)
-            commun_results = {}
-            for k, v in query_search_results.items():
-                if (k in intermediate_results):
-                    commun_results[k]=v
-            query_search_results = commun_results
-
-sorted_results = sorted(query_search_results.items(), key=operator.itemgetter(1), reverse=True)
-for url, score in sorted_results:
-    print 'URL=%s, TFIDF=%s' %(url[3::], score)
-        
-

@@ -12,7 +12,7 @@ import scrapy
 # help"
 
 connection = happybase.Connection('localhost')
-hbase_table_name = 'wiki_test'
+hbase_table_name = 'wiki'
 
 # Deleting the table
 if hbase_table_name in connection.tables():
