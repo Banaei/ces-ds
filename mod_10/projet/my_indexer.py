@@ -17,7 +17,7 @@ import gzip
 # ******************************************************************
 
 
-host= '192.168.0.11'
+host= 'localhost'
 wiki_table_name = 'wiki'
 index_table_name = 'index'
 
