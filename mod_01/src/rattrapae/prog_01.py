@@ -127,12 +127,17 @@ def stpforward(y, X, M):
                 else:
                     if (alpha > alpha_max):
                         alpha_max = alpha
-                    j_max = j
+                        j_max = j
         S.append(j_max)
         clf.fit(X[S], y)
-        t = clf.coef_
         r = y - clf.predict(X[S])
-    return t, S
+    t = clf.coef_
+    t0 = clf.intercept_
+    return  t0, t, S
 
-t, S = stpforward(y, X, 3)               
+t0, t, S = stpforward(y, X, 2)               
+
             
+# ******************************************************************
+#                  Ex. 2 - Q 2
+# ******************************************************************
