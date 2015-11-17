@@ -141,3 +141,79 @@ t0, t, S = stpforward(y, X, 2)
 # ******************************************************************
 #                  Ex. 2 - Q 2
 # ******************************************************************
+
+import numpy as np
+from sklearn.linear_model.base import LinearModel, _pre_fit
+from sklearn.base import RegressorMixin
+
+class MYOMP(LinearModel, RegressorMixin):
+    
+    def __init__(self, n_nonzero_coefs=None, fit_intercept=True,
+        normalize=True, precompute='auto'):
+        self.n_nonzero_coefs = n_nonzero_coefs
+        self.fit_intercept = fit_intercept
+        self.normalize = normalize
+        self.precompute = precompute
+        
+    def stpforward_myomp(self, y, X):
+        M = self.n_nonzero_coefs
+        t=0
+        r=y
+        S=[]
+        clf = linear_model.LinearRegression(normalize=True)
+        for i in range(M):
+            alpha_max = 0
+            j_max = 0
+            first_loop = True
+            for j in range(X.shape[1]):
+                if (j not in S):
+                    alpha = np.dot(X[:,j],r)
+                    if (first_loop):
+                        alpha_max = alpha
+                        j_max = j
+                        first_loop = False
+                    else:
+                        if (alpha > alpha_max):
+                            alpha_max = alpha
+                            j_max = j
+            S.append(j_max)
+            clf.fit(X[:,S], y)
+            r = y - clf.predict(X[:,S])
+        t = clf.coef_
+        t0 = clf.intercept_
+        return  t0, t, S
+        
+        
+    def fit(self, X, y):
+        """Fit the model using X, y as training data.
+        Parameters
+        ----------
+        X : array-like, shape (n_samples, n_features)
+        Training data.
+        y : array-like, shape (n_samples,) or (n_samples, n_targets)
+        Target values.
+        Returns
+        -------
+        self : object
+        returns an instance of self.
+        """
+        X, y, X_mean, y_mean, X_std, Gram, Xy = _pre_fit(X, y, None, self.precompute, self.normalize, self.fit_intercept, copy=True)
+        t0, t, S = self.stpforward_myomp(y, X)
+        self.coef_ = t # MODIFY HERE !!!
+        self._set_intercept(X_mean[S], y_mean, X_std[S])
+        self.indexes_ = S
+        return self
+        
+        
+myomp = MYOMP(n_nonzero_coefs=3)
+myomp.fit(X, y)
+coefs_myomp = myomp.coef_
+S = myomp.indexes_
+
+from sklearn.linear_model import OrthogonalMatchingPursuit
+
+omp = OrthogonalMatchingPursuit(n_nonzero_coefs=3)
+omp.fit(X, y)
+coefs_omp = omp.coef_
+
+
