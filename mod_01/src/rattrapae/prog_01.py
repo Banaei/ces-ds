@@ -135,7 +135,10 @@ def stpforward(y, X, M):
     t0 = clf.intercept_
     return  t0, t, S
 
-t0, t, S = stpforward(y, X, 2)               
+t0, t, S = stpforward(y, X, 3)
+print 't0=', t0
+print 't=', t
+print 'S=', S               
 
             
 # ******************************************************************
@@ -160,14 +163,14 @@ class MYOMP(LinearModel, RegressorMixin):
         t=0
         r=y
         S=[]
-        clf = linear_model.LinearRegression(normalize=True)
+        clf = linear_model.LinearRegression(normalize=self.normalize)
         for i in range(M):
             alpha_max = 0
             j_max = 0
             first_loop = True
-            for j in range(X.shape[1]):
+            for j in X.columns:
                 if (j not in S):
-                    alpha = np.dot(X[:,j],r)
+                    alpha = np.dot(X[j],r)
                     if (first_loop):
                         alpha_max = alpha
                         j_max = j
@@ -177,8 +180,8 @@ class MYOMP(LinearModel, RegressorMixin):
                             alpha_max = alpha
                             j_max = j
             S.append(j_max)
-            clf.fit(X[:,S], y)
-            r = y - clf.predict(X[:,S])
+            clf.fit(X[S], y)
+            r = y - clf.predict(X[S])
         t = clf.coef_
         t0 = clf.intercept_
         return  t0, t, S
@@ -197,23 +200,52 @@ class MYOMP(LinearModel, RegressorMixin):
         self : object
         returns an instance of self.
         """
-        X, y, X_mean, y_mean, X_std, Gram, Xy = _pre_fit(X, y, None, self.precompute, self.normalize, self.fit_intercept, copy=True)
-        t0, t, S = self.stpforward_myomp(y, X)
+        X_s, y_s, X_mean, y_mean, X_std, Gram, Xy = _pre_fit(X, y, None, self.precompute, self.normalize, self.fit_intercept, copy=True)
+        X_pd = pd.DataFrame(X_s, columns=X.columns)        
+        t0, t, S = self.stpforward_myomp(y, X_pd)
         self.coef_ = t # MODIFY HERE !!!
-        self._set_intercept(X_mean[S], y_mean, X_std[S])
+        
+        cols = list(X.columns.values)
+        indexes = [cols.index(k) for k in S]
+
+        self._set_intercept(X_mean[indexes], y_mean, X_std[indexes])
         self.indexes_ = S
         return self
         
-        
-myomp = MYOMP(n_nonzero_coefs=3)
-myomp.fit(X, y)
-coefs_myomp = myomp.coef_
-S = myomp.indexes_
+# ******************************************************************
+#                  Ex. 2 - Q 3
+# ******************************************************************
+
+for m in range(3,6):      
+    myomp = MYOMP(n_nonzero_coefs=m)
+    myomp.fit(X, y)
+    print myomp.coef_
+    print myomp.indexes_
+
+
+
+# ******************************************************************
+#                  Ex. 2 - Q 4
+# ******************************************************************
 
 from sklearn.linear_model import OrthogonalMatchingPursuit
 
-omp = OrthogonalMatchingPursuit(n_nonzero_coefs=3)
-omp.fit(X, y)
-coefs_omp = omp.coef_
+for m in range(1,6):
+    omp = OrthogonalMatchingPursuit(n_nonzero_coefs=m)
+    print omp.fit(X, y).coef_
 
 
+# ******************************************************************
+#                  Ex. 2 - Q 5
+# ******************************************************************
+
+from sklearn.cross_validation import cross_val_score
+
+scores = cross_val_score(linear_model.LinearRegression(normalize=True) , X, y, cv=10)
+print np.mean(scores)
+
+scores = []
+for m in range(1,6):
+    scores.append(cross_val_score(OrthogonalMatchingPursuit(n_nonzero_coefs=m), X, y, cv=10))
+df = pd.DataFrame(scores, index=[1, 2, 3, 4, 5])
+print df.mean(axis=1)
