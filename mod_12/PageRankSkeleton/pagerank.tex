@@ -1,0 +1,95 @@
+\documentclass[pdftex,a4paper,DIV15]{scrartcl}
+
+\usepackage{cmap}
+\usepackage[utf8]{inputenc}
+
+\usepackage[francais]{babel}
+\usepackage{url} 
+\usepackage{array}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{paralist}
+\usepackage{hyperref}
+
+\hyphenation{Map-Reduce}
+
+\title{
+PageRank\footnote{nous remercions Pierre Senellart (\texttt{pierre.senellart@telecom-paristech.fr}) pour avoir préparé ce projet. } }
+\author{Oana Balalau (TA), Luis Gallaraga (TA), Mauro Sozio \\
+(\texttt{firstname.lastname@telecom-paristech.fr})}
+
+
+\begin{document}
+
+\maketitle
+
+
+
+\section*{Calcul de PageRank dans Simple English
+Wikipedia}
+
+PageRank est la technique qu'ont proposé les fondateurs de Google, Brin
+et Page, pour associer un score aux pages du Web. L'idée de PageRank est
+la suivante: \emph{les pages importantes sur le Web sont les pages étant
+pointées par des pages importantes}. Plus généralement, le score de
+PageRank est une mesure utile à calculer dans tout graphe orienté, et
+peut révéler des informations sur l'importance et la centralité des
+n\oe{}uds de ce graphe.
+
+PageRank est défini comme la probabilité qu'un \emph{surfeur aléatoire}
+effectuant une marche aléatoire sur le Web en suivant les liens
+uniformément au hasard (et, avec une faible
+probabilité, effectuant un saut vers une autre page du Web choisie
+uniformément au hasard) se retrouve sur une page donnée dans un point
+distant du futur (une fois que la \emph{mesure d'équilibre} de la chaîne
+de Markov a été atteinte).
+
+Étant donné un graphe orienté de matrice d'adjacence $G$ ($G(i,j)$ vaut
+$1$ s'il y a un lien de $i$ vers $j$, $0$ sinon), le PageRank des
+n\oe{}uds du graphe peut être calculé de la manière suivante:
+\begin{enumerate}
+  \item Normaliser $G$ pour que chaque ligne somme à 1.
+  \item Soit $u$ le vecteur uniforme de somme $1$, soit $v$ égal à $u$.
+  \item Répéter jusqu'à convergence (par exemple différence relative
+    inférieure à 1\% entre les versions successives de $v$):
+    \begin{itemize}
+      \item $v:=(1-d){}^tGv + du$ (avec par exemple $d=\tfrac 1 4$).
+    \end{itemize}
+\end{enumerate}
+
+Vous trouverez dans l'achive un jeu de données formé du graphe
+de la version Simple English (voir \url{http://simple.wikipedia.org/}) de
+Wikipedia. Ce jeu de données est formé d'un ensemble de titre d'articles
+(labels) et d'un ensemble d'arêtes(edge\_list.txt), décrit par un fichier dont 
+chaque ligne est de la forme:
+\begin{verbatim}
+A B1,C1 B2,C2 ... Bn,Cn
+\end{verbatim}
+où \verb|A| est l'index d'un article (le fichier des titres d'articles
+les donnant dans l'ordre), \verb|B1|, \dots, \verb|Bn| sont des index
+d'articles pointés par \verb|A|, et \verb|C1|, \dots, \verb|Cn| sont le
+nombre de liens de
+\verb|A| à l'article en question.
+
+En utilisant MapReduce, le but est de calculer
+le PageRank de l'ensemble des n\oe{}uds du jeu de données, et de trier le
+résultat par PageRank décroissant.
+
+En particulier vous devrez:
+\begin{itemize}
+  \item charger le jeu de données dans HDFS, sous un format lisible par
+    Hadoop (le format \texttt{SequenceFile} est recommandé, il peut
+    être produit avec \texttt{hadoop.writetb}, cf.
+    \url{http://hadoopy.readthedocs.org/en/latest/tutorial.html} : complétez le fichier LoadIntoHDFS.py.
+  \item écrire la multiplication matricielle sous la forme d'un job
+    MapReduce: complétez le fichier PageRank.py;
+  \item écrire la structure générale du programme faisant appel à ces
+    jobs jusque convergence: complétez le fichier PageRankDriver.py;
+  \item trier et interpréter le résultat.
+\end{itemize}
+
+Quel est l'article le plus important dans Simple English Wikipedia?
+
+
+\end{document}
+
