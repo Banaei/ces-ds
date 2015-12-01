@@ -2,23 +2,21 @@
 
 import hadoopy
 
-eigen_vector_tb_path = "hdfs://localhost:9000/user/vector"
-
-beta = 0.75
-
-v_dict = {}
-l = 0
-
-print "initializing the vector ..."
-for k, v in hadoopy.readtb(eigen_vector_tb_path):
-    v_dict[k] = v
-    l += 1
-print "initializing done !"
+#eigen_vector_tb_path = "hdfs://localhost:9000/user/vector"
+#
+#beta = 0.75
+#
+#v_dict = {}
+#l = 0
+#
+#
+#for k, v in hadoopy.readtb(eigen_vector_tb_path):
+#    v_dict[k] = v
+#    l += 1
             
     
 def mapper( key, value):
-    print "inside mapper ..."
-    yield value, key
+    yield key, value
 #    inverse_degre = 1/ float(len(value))
 #    for v in value:
 #        print "map: " + key + " " + value
@@ -27,14 +25,12 @@ def mapper( key, value):
 
      
 def reducer(key, values):
-    print "inside reducer ..."
     s = 0
 #    for v in values:
 #        print "red:" + key + " " + v
 #        s += v
 #    s = (s * beta) + ((1-beta) / len(v_dict))
-    yield key, s
+    yield key, values
   
 if __name__ == "__main__":
-    print "inside main ..."
     hadoopy.run(mapper, reducer)
