@@ -18,7 +18,7 @@ clean_data.hist()
 
 plt.plot(clean_data['nb_sej'], clean_data['tx_brut_ete'], '.')
 plt.ylabel('Taux brut ETE')
-plt.xlabel('Nombre de séjours')
+plt.xlabel('Nombre de sejours')
 plt.title('')
 # plt.legend()
 plt.show()
