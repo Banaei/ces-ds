@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
 Created on Tue Dec  1 16:04:21 2015
@@ -19,8 +20,8 @@ with open('/media/sf_src/mod_10/projet/stop_words.txt', 'r') as stop_words_file:
     for line in stop_words_file:
         stopwords_list.append(line)
 
-def is_word_ok(word):
-    return (word not in stopwords_list)
+def is_word_ok(self, word):
+    return (word not in self.stopwords_list)
     
 def mapper(url, article):
     """

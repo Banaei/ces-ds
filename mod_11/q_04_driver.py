@@ -13,7 +13,7 @@ output_path = "/result"
 if hadoopy.exists(output_path):
     hadoopy.rmr("-skipTrash %s"%output_path)
 
-hadoopy.launch(input_path, output_path, 'q_04_mapred.py')
+hadoopy.launch_local(input_path, output_path, 'q_04_mapred.py')
 
 # Testing ...
 word_urls = dict(hadoopy.readtb(output_path))
