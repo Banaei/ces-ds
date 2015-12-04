@@ -13,9 +13,11 @@ output_path = "/result"
 if hadoopy.exists(output_path):
     hadoopy.rmr("-skipTrash %s"%output_path)
 
-hadoopy.launch_local(input_path, output_path, 'q_04_mapred.py')
+hadoopy.launch(input_path, output_path, 'q_04_mapred.py')
 
 # Testing ...
 word_urls = dict(hadoopy.readtb(output_path))
-for word in word_urls:
-    print "%s: %s, %s" % (word, word_urls[word][0], word_urls[word][1])
+for word, urls in word_urls.iteritems():
+    print "%s: %s" % (word, urls)
+    break
+

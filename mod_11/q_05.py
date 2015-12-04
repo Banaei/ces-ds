@@ -28,11 +28,15 @@ with result_table.batch(batch_size=1000) as db_table:
         try:
             i = 0
             for k, v in hadoopy.readtb(hdfs_input_path):
-                i += 1
+                content_dict = dict(['cf:' + url.encode('utf-8'), str(tfidf).encode('utf-8')] for url, tfidf in v)
+                key = k.encode('utf-8')
                 if (i%1000)==0:
-                    print '>> ', i, k, v
-                db_table.put(k, v)
+                    print '>> ', i, key, content_dict
+                db_table.put(key, content_dict)
+                i += 1
         except UnicodeDecodeError:
-            print '>>>>>>>>>>>  UnicodeDecodeError :', i, k, v
+            print '>>>>>>>>>>>  UnicodeDecodeError :', i, key, content_dict
         except :
-            print ">>>>>>>>>>>  Error catched !"
+            print ">>>>>>>>>>>  Error catched : ", i, key, content_dict
+
+
