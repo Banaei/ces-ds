@@ -21,3 +21,7 @@ if hadoopy.exists(hdfs_path):
 hadoopy.writetb(hdfs_path,wiki_table.scan()) # Writing the wiki table inot HDFS
 
 # Test OK (ATIH 2/12/2015)
+word_urls = dict(hadoopy.readtb(hdfs_path))
+for word, urls in word_urls.iteritems():
+    print "%s: %s" % (word, urls)
+    break
