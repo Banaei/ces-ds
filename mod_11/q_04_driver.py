@@ -7,8 +7,8 @@ Created on Tue Dec  1 16:09:56 2015
 
 import hadoopy
 
-input_path = 'wiki_index.tb'
-output_path = "/result"
+input_path = 'wiki.tb'
+output_path = "index_wiki"
 
 if hadoopy.exists(output_path):
     hadoopy.rmr("-skipTrash %s"%output_path)

@@ -10,7 +10,7 @@ import hadoopy
 
 host= 'localhost'
 result_table_name = 'module_10_q_5'
-hdfs_input_path = "/result"
+hdfs_input_path = "index_wiki"
 
 connection = happybase.Connection(host)
 

@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
 Created on Tue Dec  1 16:04:21 2015
@@ -57,8 +58,8 @@ def reducer(word, results):
         tf = result[1]
         url = result[0]
         tf_idf = tf*idf
-        values.append((url.encode('utf-8'), str(tf_idf).encode('utf-8')))
-    yield word.encode('utf-8'), values
+        values.append((url, tf_idf))
+    yield word, values
     
 if __name__ == '__main__' :
     hadoopy.run(mapper, reducer, doc=__doc__)    
