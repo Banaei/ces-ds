@@ -12,7 +12,7 @@ import scrapy
 # help"
 
 connection = happybase.Connection('localhost')
-hbase_table_name = 'wiki'
+hbase_table_name = 'wiki_test'
 
 # Deleting the table
 if hbase_table_name in connection.tables():
@@ -39,11 +39,15 @@ class WikiSpider(scrapy.Spider):
         
         data = content.encode('utf-8')
         table.put(response.url, {'cf:content': data})
+        
+        print '>>>>>>>>>>>>>>>>>>>>>>>>>>>>>  ', self.url_count
             
         for href in response.xpath('//a/@href').extract():
             href = response.urljoin(href)
             if (href.startswith('http://localhost/articles') and ('%7E' not in href)):
                 self.url_count += 1
+                if (self.url_count>100):
+                    break
                 yield scrapy.Request(href, callback=self.parse)
                 
                 
