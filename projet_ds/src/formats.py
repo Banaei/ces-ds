@@ -17,11 +17,24 @@ ano_2010_format = {'exit_month_sp': 16,
  'code_retour_sp': 22,
  'code_retour_ep': 28}
  
- ano_2014_format = {
+ano_2013_format = {
  'exit_month_sp': 16,
  'exit_month_ep': 17,
  'code_retour_sp': 22,
- 'code_retour_ep': 28
+ 'code_retour_ep': 28,
+ 'ano_sp': 31,
+ 'ano_ep': 47,
+ 'sej_num_sp': 48,
+ 'sej_num_ep': 52,
+ 'rsa_index_sp': 53,
+ 'rsa_index_ep': 62
+ }
+ 
+ano_2014_format = {
+ 'exit_month_sp': 16,
+ 'exit_month_ep': 17,
+ 'code_retour_sp': 22,
+ 'code_retour_ep': 28,
  'ano_sp': 31,
  'ano_ep': 47,
  'sej_num_sp': 48,
@@ -151,7 +164,53 @@ rsa_2010_format = {'fix_zone_length': 221,
  'type_um_offset': 24,
  'rum_length': 40}
  
- rsa_2014_format = {'fix_zone_length': 221,
+rsa_2013_format = {
+'fix_zone_length': 223,
+ 'finess_sp': 1,
+ 'finess_ep': 9,
+ 'index_sp': 13,
+ 'index_ep': 22,
+ 'cmd_sp': 42,
+ 'cmd_ep': 43,
+ 'stay_type_sp': 44,
+ 'stay_type__ep': 44,
+ 'stay_complexity_sp': 47,
+ 'stay_complexity_ep': 47,
+ 'nbrum_sp': 51,
+ 'nbrum_ep': 52,
+ 'age_in_year_sp': 53,
+ 'age_in_year_ep': 55,
+ 'age_in_day_sp': 56,
+ 'age_in_day_ep': 58,
+ 'sex_sp': 59,
+ 'sex_ep': 59,
+ 'exit_month_sp': 62,
+ 'exit_month_ep': 63,
+ 'mode_sortie_sp': 68,
+ 'mode_sortie_ep': 68,
+ 'stay_length_sp': 71,
+ 'stay_length_ep': 74,
+ 'code_geo_sp': 75,
+ 'code_geo_ep': 79,
+ 'dp_sp': 203,
+ 'dp_ep': 208,
+ 'dr_sp': 209,
+ 'dr_ep': 214,
+ 'nbdas_sp': 215,
+ 'nbdas_ep': 218,
+ 'nbactes_sp': 219,
+ 'nbactes_ep': 223,
+ 'diag_length': 6,
+ 'zone_acte_length': 22,
+ 'code_ccam_offset': 3,
+ 'code_ccam_length': 7,
+ 'type_um_length': 4,
+ 'type_um_offset': 38,
+ 'rum_length': 58}
+ 
+ 
+rsa_2014_format = {
+ 'fix_zone_length': 221,
  'finess_sp': 1,
  'finess_ep': 9,
  'index_sp': 13,
@@ -193,6 +252,8 @@ rsa_2010_format = {'fix_zone_length': 221,
  'type_um_length': 4,
  'type_um_offset': 40,
  'rum_length': 60}
+ 
+ 
 error_ano_code = 'x'
 dead_patient_code = '9'
 cmd_90_code = '90'
