@@ -182,6 +182,7 @@ rsa_2013_format = {
  'age_in_year_ep': 55,
  'age_in_day_sp': 56,
  'age_in_day_ep': 58,
+ 'rum_length': 58,
  'sex_sp': 59,
  'sex_ep': 59,
  'exit_month_sp': 62,
@@ -192,12 +193,19 @@ rsa_2013_format = {
  'stay_length_ep': 74,
  'code_geo_sp': 75,
  'code_geo_ep': 79,
+ 'nb_aut_pgv_sp': 109,
+ 'nb_aut_pgv_ep': 109,
+ 'aut_pgv_length': 2,
+ 'nb_suppl_radio_sp': 131,
+ 'nb_suppl_radio_ep': 131,
+ 'suppl_radio_length': 7,
  'dp_sp': 203,
  'dp_ep': 208,
  'dr_sp': 209,
  'dr_ep': 214,
  'nbdas_sp': 215,
  'nbdas_ep': 218,
+ 'das_length': 6,
  'nbactes_sp': 219,
  'nbactes_ep': 223,
  'diag_length': 6,
@@ -206,7 +214,7 @@ rsa_2013_format = {
  'code_ccam_length': 7,
  'type_um_length': 4,
  'type_um_offset': 38,
- 'rum_length': 58}
+}
  
  
 rsa_2014_format = {

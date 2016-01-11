@@ -7,6 +7,7 @@ Created on Sun Jan 10
 from random import random
 import formats
 import imp
+import pickle
 imp.reload(formats)
 
 def get_anos_from_file(ano_file_path, ano_format):
@@ -41,11 +42,64 @@ def get_anos_from_file(ano_file_path, ano_format):
     return ano_list
 
 
-def sample_ano_rsa_get_ano_hash(ano_file_path, ano_format, rsa_file_path, rsa_format, sampling_proportion, result_file_path=None):
+def get_cmd_from_rsa(rsa, rsa_format):
+    return rsa[rsa_format['cmd_sp'] - 1:rsa_format['cmd_ep']]
+    
+def get_dp_from_rsa(rsa, rsa_format):
+    return rsa[rsa_format['dp_sp'] - 1:rsa_format['dp_ep']]
+    
+def get_dr_from_rsa(rsa, rsa_format):
+    return rsa[rsa_format['dr_sp'] - 1:rsa_format['dr_ep']]
+    
+def get_actes_from_rsa(rsa, rsa_format):
+    rsa = rsa.replace('\n', '')
+    fixed_zone_length = int(rsa_format['fix_zone_length'])
+    nb_aut_pgv = int(rsa[rsa_format['nb_aut_pgv_sp'] - 1:rsa_format['nb_aut_pgv_ep']])
+    aut_pgv_length = int(rsa_format['aut_pgv_length'])
+    nb_suppl_radio = int(rsa[rsa_format['nb_suppl_radio_sp'] - 1:rsa_format['nb_suppl_radio_ep']])
+    suppl_radio_length = int(rsa_format['suppl_radio_length'])
+    nb_rum = int(rsa[rsa_format['nbrum_sp'] - 1:rsa_format['nbrum_ep']])
+    rum_length = int(rsa_format['rum_length'])
+    nb_das = int(rsa[rsa_format['nbdas_sp'] - 1:rsa_format['nbdas_ep']])
+    das_length = int(rsa_format['das_length'])
+    nb_zones_actes = int(rsa[rsa_format['nbactes_sp'] - 1:rsa_format['nbactes_ep']])
+    zone_acte_length = int(rsa_format['zone_acte_length'])
+    code_ccam_offset = int(rsa_format['code_ccam_offset'])
+    code_ccam_length = int(rsa_format['code_ccam_length'])
+    
+    type_um_offset = int(rsa_format['type_um_offset'])
+    type_um_length = int(rsa_format['type_um_length'])
+    
+    rsa_length = fixed_zone_length + nb_aut_pgv*aut_pgv_length + nb_suppl_radio*suppl_radio_length+nb_rum*rum_length + nb_das*das_length + nb_zones_actes*zone_acte_length
+    if (len(rsa)!=rsa_length):
+        raise Exception('The RSA length ' + str(len(rsa)) + ' is different from calculated lentgh ' + str(rsa_length) + " >" + rsa + '<')
+    
+    
+    first_um_sp = fixed_zone_length + (nb_aut_pgv * aut_pgv_length) + (nb_suppl_radio * suppl_radio_length) + type_um_offset
+    type_um_dict = {}
+    for i in range(0, nb_rum):
+        type_um = rsa[first_um_sp - 1: first_um_sp + type_um_length]
+        type_um_dict[type_um] = 1
+        first_um_sp += rum_length
+    
+    first_act_sp = fixed_zone_length + (nb_aut_pgv * aut_pgv_length) + (nb_suppl_radio * suppl_radio_length) + (nb_rum * rum_length) + code_ccam_offset
+    actes_dict = {}    
+    for i in range(0, nb_zones_actes):
+        acte = rsa[first_act_sp - 1: first_act_sp + code_ccam_length]
+        actes_dict[acte] = 1
+        first_act_sp += zone_acte_length
+    
+    return type_um_dict.keys(), actes_dict.keys()
+
+def sample_ano_rsa_get_ano_hash(ano_file_path, ano_format, rsa_file_path, rsa_format, sampling_proportion, result_file_path=None, limit=None):
     """
     Lit simultanemant un fichier ano et un fichier rsa, ligne par ligne. Si le rsa e l'ano sont OK, il les selectionne
-    avec la probabilite sapmling_proportion, et ajoute le numero anonyme (ano_hash) a un hash map (dict) et retourne à 
-    la fin la liste des ano_hash ainsi selectionnes
+    avec la probabilite sapmling_proportion.
+    Le resultat est un dict avec :
+    - key : ano_hash
+    - value : liste des sej_num tries par ordre croissant
+    Si result_file_path est renseigne le dict est enregistre sous ce nom
+    Si limit est renseigne le nombre de dossiers selectionnes sera plafonne a cette limite
     """
     ano_hash_dict = {}
     line_number = 0
@@ -59,18 +113,34 @@ def sample_ano_rsa_get_ano_hash(ano_file_path, ano_format, rsa_file_path, rsa_fo
                         pass
                     else:
                         ano_hash = ano_line[ano_format['ano_sp'] - 1:ano_format['ano_ep']]
-                        ano_hash_dict[ano_hash]=1
+                        sej_num = int(ano_line[ano_format['sej_num_sp'] - 1:ano_format['sej_num_ep']])
+                        if (ano_hash not in ano_hash_dict):
+                            ano_hash_dict[ano_hash]=list()
+                        ano_hash_dict[ano_hash].append(sej_num)
+                        ano_hash_dict[ano_hash].sort()
                 line_number += 1
                 if line_number % 10000 == 0:
                     print '\rPorcessed ', line_number, 'taken', len(ano_hash_dict)
                 if not rsa_line and not ano_line:
                     break
-    ano_hash_list = ano_hash_dict.keys()
+                if (limit!=None) and (len(ano_hash_dict) > limit):
+                    break
+                a, b = get_actes_from_rsa(rsa_line, rsa_format)
+                print 'UM=', a
+                print 'ACTES=', b
     if (result_file_path != None):
-        with open(result_file_path, 'w') as result_file:
-            result_file.writelines( "%s\n" % item for item in ano_hash_list)
-    return ano_hash_list
+        with open(result_file_path, 'wb') as result_file:
+            pickle.dump(ano_hash_dict, result_file)
+    return ano_hash_dict
        
+       
+def load_selected_ano_hashes(selected_ano_hashes_file_path):
+    """
+    Lit la dict des ano_hashes selectionnes a partir du fichier dont le path est retournee
+    """
+    with open(selected_ano_hashes_file_path, 'rb') as f:
+        result = pickle.load(f)
+    return result
 
 def is_ano_ok(line, ano_format):
     """
