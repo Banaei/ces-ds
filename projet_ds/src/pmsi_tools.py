@@ -51,22 +51,36 @@ def get_dp_from_rsa(rsa, rsa_format):
 def get_dr_from_rsa(rsa, rsa_format):
     return rsa[rsa_format['dr_sp'] - 1:rsa_format['dr_ep']]
     
-def get_actes_from_rsa(rsa, rsa_format):
+def get_rsa_data(rsa, rsa_format):
+    
     rsa = rsa.replace('\n', '')
+    
+    index = int(rsa[rsa_format['index_sp'] - 1:rsa_format['index_ep']].strip())
+    sex = int(rsa[rsa_format['sex_sp'] - 1:rsa_format['sex_ep']].strip())
+    departement = int(rsa[rsa_format['finess_sp'] - 1:rsa_format['finess_sp']+2].strip())
+    dp = rsa[rsa_format['dp_sp'] - 1:rsa_format['dp_ep']].strip()
+    dr = rsa[rsa_format['dr_sp'] - 1:rsa_format['dr_ep']].strip()
+    try:
+        age = int(rsa[rsa_format['age_in_year_sp'] - 1:rsa_format['age_in_year_ep']].strip())
+    except ValueError:
+        age = 0
+    stay_length = int(rsa[rsa_format['stay_length_sp'] - 1:rsa_format['stay_length_ep']].strip())
+    stay_type = rsa[rsa_format['stay_type_sp'] - 1:rsa_format['stay_type_ep']].strip()
+    stay_complexity = rsa[rsa_format['stay_complexity_sp'] - 1:rsa_format['stay_complexity_ep']].strip()
+    
     fixed_zone_length = int(rsa_format['fix_zone_length'])
-    nb_aut_pgv = int(rsa[rsa_format['nb_aut_pgv_sp'] - 1:rsa_format['nb_aut_pgv_ep']])
+    nb_aut_pgv = int(rsa[rsa_format['nb_aut_pgv_sp'] - 1:rsa_format['nb_aut_pgv_ep']].strip())
     aut_pgv_length = int(rsa_format['aut_pgv_length'])
-    nb_suppl_radio = int(rsa[rsa_format['nb_suppl_radio_sp'] - 1:rsa_format['nb_suppl_radio_ep']])
+    nb_suppl_radio = int(rsa[rsa_format['nb_suppl_radio_sp'] - 1:rsa_format['nb_suppl_radio_ep']].strip())
     suppl_radio_length = int(rsa_format['suppl_radio_length'])
-    nb_rum = int(rsa[rsa_format['nbrum_sp'] - 1:rsa_format['nbrum_ep']])
+    nb_rum = int(rsa[rsa_format['nbrum_sp'] - 1:rsa_format['nbrum_ep']].strip())
     rum_length = int(rsa_format['rum_length'])
-    nb_das = int(rsa[rsa_format['nbdas_sp'] - 1:rsa_format['nbdas_ep']])
+    nb_das = int(rsa[rsa_format['nbdas_sp'] - 1:rsa_format['nbdas_ep']].strip())
     das_length = int(rsa_format['das_length'])
-    nb_zones_actes = int(rsa[rsa_format['nbactes_sp'] - 1:rsa_format['nbactes_ep']])
+    nb_zones_actes = int(rsa[rsa_format['nbactes_sp'] - 1:rsa_format['nbactes_ep']].strip())
     zone_acte_length = int(rsa_format['zone_acte_length'])
     code_ccam_offset = int(rsa_format['code_ccam_offset'])
     code_ccam_length = int(rsa_format['code_ccam_length'])
-    
     type_um_offset = int(rsa_format['type_um_offset'])
     type_um_length = int(rsa_format['type_um_length'])
     
@@ -78,19 +92,40 @@ def get_actes_from_rsa(rsa, rsa_format):
     first_um_sp = fixed_zone_length + (nb_aut_pgv * aut_pgv_length) + (nb_suppl_radio * suppl_radio_length) + type_um_offset
     type_um_dict = {}
     for i in range(0, nb_rum):
-        type_um = rsa[first_um_sp - 1: first_um_sp + type_um_length]
+        type_um = rsa[first_um_sp: first_um_sp + type_um_length].strip()
         type_um_dict[type_um] = 1
         first_um_sp += rum_length
+        
+    first_das_sp = fixed_zone_length + nb_aut_pgv*aut_pgv_length + nb_suppl_radio*suppl_radio_length+nb_rum*rum_length
+    das_dict = {}
+    for i in range(0, nb_das):
+        das = rsa[first_das_sp : first_das_sp + das_length].strip()
+        das_dict[das] = 1
+        first_das_sp += das_length
     
-    first_act_sp = fixed_zone_length + (nb_aut_pgv * aut_pgv_length) + (nb_suppl_radio * suppl_radio_length) + (nb_rum * rum_length) + code_ccam_offset
+    
+    first_act_sp = fixed_zone_length + nb_aut_pgv*aut_pgv_length + nb_suppl_radio*suppl_radio_length + nb_rum*rum_length + nb_das*das_length + code_ccam_offset
     actes_dict = {}    
     for i in range(0, nb_zones_actes):
-        acte = rsa[first_act_sp - 1: first_act_sp + code_ccam_length]
+        acte = rsa[first_act_sp : first_act_sp + code_ccam_length].strip()
         actes_dict[acte] = 1
         first_act_sp += zone_acte_length
+        
+    return {
+    'index':index,
+    'sex':sex,
+    'dpt':departement,
+    'dp':dp,
+    'dr':dr,
+    'age':age,
+    'stay_length':stay_length,
+    'stay_type':stay_type,
+    'stay_complexity':stay_complexity,
+    'type_um':type_um_dict.keys(),
+    'das':das_dict.keys(),
+    'actes':actes_dict.keys()
+     }
     
-    return type_um_dict.keys(), actes_dict.keys()
-
 def sample_ano_rsa_get_ano_hash(ano_file_path, ano_format, rsa_file_path, rsa_format, sampling_proportion, result_file_path=None, limit=None):
     """
     Lit simultanemant un fichier ano et un fichier rsa, ligne par ligne. Si le rsa e l'ano sont OK, il les selectionne
@@ -101,7 +136,7 @@ def sample_ano_rsa_get_ano_hash(ano_file_path, ano_format, rsa_file_path, rsa_fo
     Si result_file_path est renseigne le dict est enregistre sous ce nom
     Si limit est renseigne le nombre de dossiers selectionnes sera plafonne a cette limite
     """
-    ano_hash_dict = {}
+    result_dict = {}
     line_number = 0
     with open(rsa_file_path) as rsa_file:
         with open(ano_file_path) as ano_file:
@@ -113,27 +148,26 @@ def sample_ano_rsa_get_ano_hash(ano_file_path, ano_format, rsa_file_path, rsa_fo
                         pass
                     else:
                         ano_hash = ano_line[ano_format['ano_sp'] - 1:ano_format['ano_ep']]
+                        index = ano_line[ano_format['rsa_index_sp'] - 1:ano_format['rsa_index_ep']]
                         sej_num = int(ano_line[ano_format['sej_num_sp'] - 1:ano_format['sej_num_ep']])
-                        if (ano_hash not in ano_hash_dict):
-                            ano_hash_dict[ano_hash]=list()
-                        ano_hash_dict[ano_hash].append(sej_num)
-                        ano_hash_dict[ano_hash].sort()
+                        if (ano_hash not in result_dict):
+                            result_dict[ano_hash]={}
+                        rsa_data_dict = get_rsa_data(rsa_line, rsa_format)
+                        rsa_data_dict['sej_num']=sej_num
+                        result_dict[ano_hash][index]=rsa_data_dict
+                        result_dict[ano_hash]
                 line_number += 1
                 if line_number % 10000 == 0:
-                    print '\rPorcessed ', line_number, 'taken', len(ano_hash_dict)
+                    print '\rPorcessed ', line_number, 'taken', len(result_dict)
                 if not rsa_line and not ano_line:
                     break
-                if (limit!=None) and (len(ano_hash_dict) > limit):
+                if (limit!=None) and (len(result_dict) > limit):
                     break
-                a, b = get_actes_from_rsa(rsa_line, rsa_format)
-                print 'UM=', a
-                print 'ACTES=', b
     if (result_file_path != None):
         with open(result_file_path, 'wb') as result_file:
-            pickle.dump(ano_hash_dict, result_file)
-    return ano_hash_dict
-       
-       
+            pickle.dump(result_dict, result_file)
+    return result_dict
+              
 def load_selected_ano_hashes(selected_ano_hashes_file_path):
     """
     Lit la dict des ano_hashes selectionnes a partir du fichier dont le path est retournee
