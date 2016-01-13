@@ -10,6 +10,20 @@ import imp
 import pickle
 imp.reload(formats)
 
+#####################################
+#           Constants
+#####################################
+
+# Delais en jours entre deux hospitalisations pour que ca puisse etre considere comme une rehospit
+delai_rehosp = 7
+
+
+
+#####################################
+#           Functions
+#####################################
+
+
 def get_anos_from_file(ano_file_path, ano_format):
     """
     Cete methode lit le fichier ano ligne pas ligne et extrait une listeles donnees suivantes 
@@ -57,7 +71,8 @@ def get_rsa_data(rsa, rsa_format):
     
     index = int(rsa[rsa_format['index_sp'] - 1:rsa_format['index_ep']].strip())
     sex = int(rsa[rsa_format['sex_sp'] - 1:rsa_format['sex_ep']].strip())
-    departement = int(rsa[rsa_format['finess_sp'] - 1:rsa_format['finess_sp']+2].strip())
+    departement = rsa[rsa_format['finess_sp'] - 1:rsa_format['finess_sp']+2].strip()
+    cmd = rsa[rsa_format['cmd_sp'] - 1:rsa_format['cmd_ep']].strip()
     dp = rsa[rsa_format['dp_sp'] - 1:rsa_format['dp_ep']].strip()
     dr = rsa[rsa_format['dr_sp'] - 1:rsa_format['dr_ep']].strip()
     try:
@@ -113,6 +128,7 @@ def get_rsa_data(rsa, rsa_format):
         
     return {
     'index':index,
+    'cmd':cmd,
     'sex':sex,
     'dpt':departement,
     'dp':dp,
@@ -123,7 +139,8 @@ def get_rsa_data(rsa, rsa_format):
     'stay_complexity':stay_complexity,
     'type_um':type_um_dict.keys(),
     'das':das_dict.keys(),
-    'actes':actes_dict.keys()
+    'actes':actes_dict.keys(),
+    'rehosp':0,
      }
     
 def sample_ano_rsa_get_ano_hash(ano_file_path, ano_format, rsa_file_path, rsa_format, sampling_proportion, result_file_path=None, limit=None):
@@ -144,18 +161,16 @@ def sample_ano_rsa_get_ano_hash(ano_file_path, ano_format, rsa_file_path, rsa_fo
                 rsa_line = rsa_file.readline()
                 ano_line = ano_file.readline()
                 if is_ano_ok(ano_line, ano_format) and is_rsa_ok(rsa_line, rsa_format):
-                    if (random()>sampling_proportion):
+                    ano_hash = ano_line[ano_format['ano_sp'] - 1:ano_format['ano_ep']]
+                    if (ano_hash not in result_dict) and (random()>sampling_proportion):
                         pass
                     else:
-                        ano_hash = ano_line[ano_format['ano_sp'] - 1:ano_format['ano_ep']]
-                        index = ano_line[ano_format['rsa_index_sp'] - 1:ano_format['rsa_index_ep']]
                         sej_num = int(ano_line[ano_format['sej_num_sp'] - 1:ano_format['sej_num_ep']])
                         if (ano_hash not in result_dict):
-                            result_dict[ano_hash]={}
+                            result_dict[ano_hash]=list()
                         rsa_data_dict = get_rsa_data(rsa_line, rsa_format)
                         rsa_data_dict['sej_num']=sej_num
-                        result_dict[ano_hash][index]=rsa_data_dict
-                        result_dict[ano_hash]
+                        result_dict[ano_hash].append(rsa_data_dict)
                 line_number += 1
                 if line_number % 10000 == 0:
                     print '\rPorcessed ', line_number, 'taken', len(result_dict)
@@ -163,11 +178,41 @@ def sample_ano_rsa_get_ano_hash(ano_file_path, ano_format, rsa_file_path, rsa_fo
                     break
                 if (limit!=None) and (len(result_dict) > limit):
                     break
+    # Tri des patients rehospitalises en fonciton de sej_num
+    # Detection d'une rehospit
+    for k in result_dict.keys():    
+        if (len(result_dict[k])>1):
+            print '--------------------------'
+            print k
+            result_dict[k].sort(key=lambda x:x['sej_num'])
+            first_loop = True
+            last_sej_num = 0
+            current_sej_num = 0
+            for i in range(len(result_dict[k])-1,-1,-1):
+                if (first_loop):
+                    last_sej_num = result_dict[k][i]['sej_num']
+                    first_loop = False
+                    continue
+                else:
+                    current_sej_num = result_dict[k][i]['sej_num']
+                    if (last_sej_num - current_sej_num) <= delai_rehosp:
+                        result_dict[k][i]['rehosp']=1
+                print last_sej_num - current_sej_num
+                last_sej_num = current_sej_num
+            
+
     if (result_file_path != None):
         with open(result_file_path, 'wb') as result_file:
             pickle.dump(result_dict, result_file)
     return result_dict
               
+              
+def sort_rsa_data_dict_by_sej_num(rsa_data_dict):
+    for k in rsa_data_dict.keys():    
+        if (len(rsa_data_dict[k])>1):
+            rsa_data_dict[k].sort(key=lambda x:x['sej_num'])
+    
+    
 def load_selected_ano_hashes(selected_ano_hashes_file_path):
     """
     Lit la dict des ano_hashes selectionnes a partir du fichier dont le path est retournee
