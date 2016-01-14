@@ -1,0 +1,48 @@
+01A;Réanimation adulte hors grands brûlés
+01B;Réanimation adulte grands brûlés
+02A;Soins intensifs en cardiologie = USIC
+02B;Autres soins intensifs (hors UNV, USIC, néonatologie)
+03A;Soins surveillance continue adulte hors grands brûlés
+03B;Soins surveillance continue adulte grands brûlés
+04;Néonatologie sans SI
+05;Soins intensifs en néonatologie
+06;Réanimation néonatale
+07A;UHCD structures des urgences générales 
+07B;UHCD structures des urgences pédiatriques
+08;Soins et accompagnement des malades en phase terminale (unité de soins palliatifs)
+13A;Réanimation pédiatrique hors grand brûlés
+13B;Réanimation pédiatrique grands brûlés
+14A;Soins surveillance continue pédiatrique hors grands brûlés
+14B;Soins surveillance continue pédiatrique grands brûlés
+16;Unité d'hématologie équipée d'un système de traitement de l'air
+17;UNV hors SI
+18;Soins intensifs en UNV
+19;Unité d'addictologie de recours et de référence
+20;Traitement des grands brûlés (hors réanimation et surveillance continue grands brûlés)
+21;Hémodialyse en centre pour adulte
+22;Hémodialyse en centre pour enfant
+23;Hémodialyse en unité médicalisée
+30;Centre identifié pour la prise en charge des infections ostéoarticulaires
+34;Hémodialyse en unité d'autodialyse
+35;Hémodialyse à domicile
+36;Dialyse péritonéale à domicile
+37;Unité de dialyse saisonnière
+26;Unité hospitalière sécurisée interrégionale UHSI
+40;Unité d'hospitalisation d'oncologie médicale
+41;Unité d'hospitalisation d'oncologie chirurgicale
+42;Unité de radiothérapie ambulatoire
+43;Unité de chimiothérapie ambulatoire
+50;Chirurgie cardiaque
+51;Neurochirurgie
+52;Autre chirurgie pédiatrique  (ou chirurgie indifférenciée pédiatrique)
+53;Autre  chirurgie adulte  (ou chirurgie indifférenciée adulte)
+61;Unité de prise en charge de la douleur chronique
+27;Médecine gériatrique 
+28;Médecine pédiatrique (hors unité d'oncologie médicale, spécialisée ou non)
+29;Autres spécialités médicales adultes (non classées ailleurs) ou unité de médecine indifférenciée
+60;Centre identifié pour la pose de valves aortiques par voie percutanée
+70;Gynécologie seule
+71;Obstétrique seule
+72;Interruption volontaire de grossesse
+73;Gynécologie obstétrique indifférenciée
+88;Unité supprimée
