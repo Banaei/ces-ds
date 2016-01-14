@@ -212,7 +212,7 @@ rsa_2013_format = {
  'zone_acte_length': 22,
  'code_ccam_offset': 3,
  'code_ccam_length': 7,
- 'type_um_length': 2,
+ 'type_um_length': 3,
  'type_um_offset': 38,
 }
  
