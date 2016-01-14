@@ -1,0 +1,16 @@
+Réanimation 01
+Soins intensifs 02
+Surveillance continue 03
+Néonatalogie sans soins intensifs (type 2A) 04
+Néonatalogie avec soins intensifs (type 2B) 05
+Néonatalogie et réanimation périnatale (type 3) 06
+Zone de surveillance de très courte durée17 07
+Soins palliatifs 08
+Anesthésie ou chirurgie ambulatoire 11
+Hospitalisation à temps partiel de jour ou de nuit 12
+Réanimation pédiatrique 13
+Surveillance continue pédiatrique 14
+Clinique ouverte 15
+Centre d'hémodialyse 21
+Centre d'hémodialyse pour enfant 22
+Unité d'hémodialyse médicalisée 23 

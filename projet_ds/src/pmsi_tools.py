@@ -80,8 +80,8 @@ def get_rsa_data(rsa, rsa_format):
     except ValueError:
         age = 0
     stay_length = int(rsa[rsa_format['stay_length_sp'] - 1:rsa_format['stay_length_ep']].strip())
-    stay_type = rsa[rsa_format['stay_type_sp'] - 1:rsa_format['stay_type_ep']].strip()
-    stay_complexity = rsa[rsa_format['stay_complexity_sp'] - 1:rsa_format['stay_complexity_ep']].strip()
+    type_ghm = rsa[rsa_format['type_ghm_sp'] - 1:rsa_format['type_ghm_ep']].strip()
+    complexity_ghm = rsa[rsa_format['complexity_ghm_sp'] - 1:rsa_format['complexity_ghm_ep']].strip()
     
     fixed_zone_length = int(rsa_format['fix_zone_length'])
     nb_aut_pgv = int(rsa[rsa_format['nb_aut_pgv_sp'] - 1:rsa_format['nb_aut_pgv_ep']].strip())
@@ -135,8 +135,8 @@ def get_rsa_data(rsa, rsa_format):
     'dr':dr,
     'age':age,
     'stay_length':stay_length,
-    'stay_type':stay_type,
-    'stay_complexity':stay_complexity,
+    'type_ghm':type_ghm,
+    'complexity_ghm':complexity_ghm,
     'type_um':type_um_dict.keys(),
     'das':das_dict.keys(),
     'actes':actes_dict.keys(),

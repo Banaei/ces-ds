@@ -32,3 +32,8 @@ for k in r.keys():
             print(rsa['cmd'])
 print rehosps_count
 print len(rsas)
+
+
+for k in r.keys():
+    for rsa in r[k]:
+        print rsa['stay_type']
