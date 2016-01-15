@@ -18,14 +18,14 @@ imp.reload(formats)
 delai_rehosp = 7
 
 
-codes_ghm_file_path = '/DS/src/projet_ds/data/codes_ghm.txt'
-codes_cim_file_path = '/DS/src/projet_ds/data/codes_cim10.txt'
-codes_ccam_file_path = '/DS/src/projet_ds/data/codes_ccam.txt'
-codes_type_um_file_path = '/DS/src/projet_ds/data/codes_type_um.txt'
-codes_cmd_file_path = '/DS/src/projet_ds/data/codes_cmd.txt'
-codes_departement_file_path = '/DS/src/projet_ds/data/codes_departement.txt'
-codes_type_ghm_file_path = '/DS/src/projet_ds/data/codes_type_ghm.txt'
-codes_complexity_ghm_file_path = '/DS/src/projet_ds/data/codes_complexity_ghm.txt'
+codes_ghm_file_path = '../data/codes_ghm.txt'
+codes_cim_file_path = '../data/codes_cim10.txt'
+codes_ccam_file_path = '../data/codes_ccam.txt'
+codes_type_um_file_path = '../data/codes_type_um.txt'
+codes_cmd_file_path = '../data/codes_cmd.txt'
+codes_departement_file_path = '../data/codes_departement.txt'
+codes_type_ghm_file_path = '../data/codes_type_ghm.txt'
+codes_complexity_ghm_file_path = '../data/codes_complexity_ghm.txt'
 
 
 
@@ -37,6 +37,7 @@ codes_complexity_ghm_list = list()
 codes_cmd_list = list()
 codes_departement_list = list()
 codes_type_ghm_list = list()
+column_label_dict = {}
 
 
 
@@ -58,6 +59,34 @@ def fill_codes(codes_file_path, codes_list):
             codes_list.append(code.strip('\n').strip())
     codes_list.sort()
     
+def create_column_labels():
+    column_label_list = list()
+    column_label_list.append('sex')
+    column_label_list.append('age')
+    column_label_list.append('stay_length')
+    for dpt in codes_departement_list:
+        column_label_list.append('dpt_' + dpt)
+    for type_ghm in codes_type_ghm_list:
+        column_label_list.append('type_ghm_' + type_ghm)
+    for complexity_ghm in codes_complexity_ghm_list:
+        column_label_list.append('complexity_ghm_' + complexity_ghm)
+    for type_um in codes_type_um_list:
+        column_label_list.append('type_um_' + type_um)
+    for dp in codes_cim_list:
+        column_label_list.append('dp_' + dp)
+    for dr in codes_cim_list:
+        column_label_list.append('dr_' + dr)
+    for das in codes_cim_list:
+        column_label_list.append('das_' + das)
+    for acte in codes_ccam_list:
+        column_label_list.append('acte_' + das)
+    i = 0
+    for label in column_label_list:
+        column_label_dict[label] = i
+        i += 1
+        
+        
+    
 def init():
     fill_codes(codes_ghm_file_path, codes_ghm_list)
     fill_codes(codes_cim_file_path, codes_cim_list)
@@ -67,8 +96,11 @@ def init():
     fill_codes(codes_departement_file_path, codes_departement_list)
     fill_codes(codes_type_ghm_file_path, codes_type_ghm_list)
     fill_codes(codes_complexity_ghm_file_path, codes_complexity_ghm_list)
+    create_column_labels()
     pass
     
+
+init()
 
 #############  Check functions
     
@@ -335,3 +367,6 @@ df = pd.DataFrame(np.random.randn(8, 3), columns=list('ABC'))
 
 df.loc[1,'B'] = 55
 
+from scipy import sparse
+m = sparse.csr_matrix((50000, 150000))
+pd.SparseDataFrame([ pd.SparseSeries(m[i].toarray().ravel()) for i in np.arange(m.shape[0]) ])
