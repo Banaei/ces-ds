@@ -245,7 +245,7 @@ def get_rsa_data(rsa, rsa_format):
     'rehosp':0,
      }
     
-def sample_ano_rsa_get_ano_hash(ano_file_path, ano_format, rsa_file_path, rsa_format, sampling_proportion, result_file_path=None, limit=None):
+def sample_ano_rsa(ano_file_path, ano_format, rsa_file_path, rsa_format, sampling_proportion, result_file_path=None, limit=None):
     """
     Lit simultanemant un fichier ano et un fichier rsa, ligne par ligne. Si le rsa e l'ano sont OK, il les selectionne
     avec la probabilite sapmling_proportion.
@@ -317,5 +317,21 @@ def load_selected_ano_hashes(selected_ano_hashes_file_path):
     return result
 
 
+def get_as_rsa_list(result_dict):
+    """
+    Retourne une liste de RSA a partir d'un result_dict (retourne par la methode sample_ano_rsa)
+    """
+    rsa_list = list()
+    for k in result_dict.keys():
+        for rsa in result_dict[k]:
+            rsa_list.append(rsa)
+    return rsa_list
 
-        
+
+import numpy as np
+import pandas as pd
+
+df = pd.DataFrame(np.random.randn(8, 3), columns=list('ABC'))        
+
+df.loc[1,'B'] = 55
+

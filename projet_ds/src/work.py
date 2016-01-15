@@ -22,6 +22,7 @@ r = pmsi_tools.sample_ano_rsa_get_ano_hash(ano_file_path_2013, formats.ano_2013_
 s = pmsi_tools.load_selected_ano_hashes(selected_ano_hashes_file_path)
 
 
+# Recuperation des rsa sous forme de list
 rsas = list()
 rehosps_count = 0
 for k in r.keys():
@@ -30,8 +31,9 @@ for k in r.keys():
         if (rsa['rehosp']==1):
             rehosps_count += 1
             print(rsa['cmd'])
-print rehosps_count
-print len(rsas)
+
+
+
 
 
 for k in r.keys():
