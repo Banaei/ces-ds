@@ -79,7 +79,7 @@ def create_column_labels():
     for das in codes_cim_list:
         column_label_list.append('das_' + das)
     for acte in codes_ccam_list:
-        column_label_list.append('acte_' + das)
+        column_label_list.append('acte_' + acte)
     i = 0
     for label in column_label_list:
         column_label_dict[label] = i
@@ -88,6 +88,14 @@ def create_column_labels():
         
     
 def init():
+    del codes_ghm_list[:]
+    del codes_ccam_list[:]
+    del codes_cim_list[:]
+    del codes_type_um_list[:]
+    del codes_complexity_ghm_list[:]
+    del codes_cmd_list[:]
+    del codes_departement_list[:]
+    del codes_type_ghm_list[:]
     fill_codes(codes_ghm_file_path, codes_ghm_list)
     fill_codes(codes_cim_file_path, codes_cim_list)
     fill_codes(codes_ccam_file_path, codes_ccam_list)
@@ -97,10 +105,9 @@ def init():
     fill_codes(codes_type_ghm_file_path, codes_type_ghm_list)
     fill_codes(codes_complexity_ghm_file_path, codes_complexity_ghm_list)
     create_column_labels()
-    pass
+
     
 
-init()
 
 #############  Check functions
     
@@ -194,13 +201,13 @@ def get_rsa_data(rsa, rsa_format):
         
     stay_length = int(rsa[rsa_format['stay_length_sp'] - 1:rsa_format['stay_length_ep']].strip())
     
-    type_ghm = rsa[rsa_format['type_ghm_sp']:rsa_format['type_ghm_ep']].strip()
-    if (len(type_ghm)>0) and (not check_code(type_ghm, type_ghm=True)):
+    type_ghm = rsa[rsa_format['type_ghm_sp']-1:rsa_format['type_ghm_ep']].strip()
+    if (not check_code(type_ghm, type_ghm=True)):
         print 'Error in TYPE GHM %s, RSA ignored' % (type_ghm)
         error = True
     
-    complexity_ghm = rsa[rsa_format['complexity_ghm_sp']:rsa_format['complexity_ghm_ep']].strip()
-    if (len(complexity_ghm)>0) and (not check_code(complexity_ghm, complexity_ghm=True)):
+    complexity_ghm = rsa[rsa_format['complexity_ghm_sp']-1:rsa_format['complexity_ghm_ep']].strip()
+    if (not check_code(complexity_ghm, complexity_ghm=True)):
         print 'Error in COMPLEXITY OF GHM %s, RSA ignored' % (complexity_ghm)
         error = True
     
@@ -359,14 +366,33 @@ def get_as_rsa_list(result_dict):
             rsa_list.append(rsa)
     return rsa_list
 
+def rsa_to_X_y(rsa, X, y, i, cld):
+    X[i, cld['sex']]=rsa['sex']
+    X[i, cld['age']]=rsa['age']
+    X[i, cld['stay_length']]=rsa['stay_length']
+    X[i, cld['dpt_' + rsa['dpt']]]=1
+    X[i, cld['type_ghm_' + rsa['type_ghm']]]=1
+    X[i, cld['complexity_ghm_' + rsa['complexity_ghm']]]=1
+    for t_u in rsa['type_um']:
+        X[i, cld['type_um_' + t_u]]=1
+    X[i, cld['dp_' + rsa['dp']]]=1
+    if (len(rsa['dr'])>0):
+        X[i, cld['dr_' + rsa['dr']]]=1
+    for das in rsa['das']:
+        X[i, cld['das_' + das]]=1
+    for acte in rsa['actes']:
+        X[i, cld['acte_' + acte]]=1
+    y[i] = rsa['rehosp']
 
-import numpy as np
-import pandas as pd
 
-df = pd.DataFrame(np.random.randn(8, 3), columns=list('ABC'))        
-
-df.loc[1,'B'] = 55
-
-from scipy import sparse
-m = sparse.csr_matrix((50000, 150000))
-pd.SparseDataFrame([ pd.SparseSeries(m[i].toarray().ravel()) for i in np.arange(m.shape[0]) ])
+#
+#import numpy as np
+#import pandas as pd
+#
+#df = pd.DataFrame(np.random.randn(8, 3), columns=list('ABC'))        
+#
+#df.loc[1,'B'] = 55
+#
+#from scipy import sparse
+#m = sparse.csr_matrix((50000, 150000))
+#pd.SparseDataFrame([ pd.SparseSeries(m[i].toarray().ravel()) for i in np.arange(m.shape[0]) ])
