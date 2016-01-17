@@ -9,10 +9,9 @@ Addind this line to test GitHub
 import formats
 import pmsi_tools
 import imp
-import numpy as np
 imp.reload(pmsi_tools)
 imp.reload(formats)
-from pmsi_tools import column_label_dict as cld
+from pmsi_tools import column_label_list as cll
 
 
 ano_file_path_2013 = '/DS/data/pmsi/ano13.txt'
@@ -20,19 +19,11 @@ rsa_file_path_2013 = '/DS/data/pmsi/rsa13.txt'
 selected_ano_hashes_file_path = '/DS/data/pmsi/selected_ano_hash.txt'
 
 pmsi_tools.init()
-result_dict = pmsi_tools.sample_ano_rsa(ano_file_path_2013, formats.ano_2013_format, rsa_file_path_2013, formats.rsa_2013_format,  0.5, result_file_path=selected_ano_hashes_file_path, limit=2000)
 
+training_anos = pmsi_tools.rand_select_anos(ano_file_path_2013, formats.ano_2013_format, 0.001)
+training_result_dict = pmsi_tools.sample_ano_rsa(ano_file_path_2013, formats.ano_2013_format, rsa_file_path_2013, formats.rsa_2013_format, inclusion_anos_set=training_anos)
+training_s_X, training_s_y = pmsi_tools.get_sparse_X_y_from_data(training_result_dict)
 
-# Recuperation des rsa sous forme de list
-rsa_list = pmsi_tools.get_as_rsa_list(result_dict)
-
-
-cols_count = len(cld)
-i = 0
-rsa = rsa_list[0]
-X = np.zeros((1, cols_count))
-y = np.zeros((1,1))
-
-
-
-rsa_to_X_y(rsa, X, y, 0, cld)
+test_anos = pmsi_tools.rand_select_anos(ano_file_path_2013, formats.ano_2013_format, 0.01, exclusion_set=training_anos)
+test_result_dict = pmsi_tools.sample_ano_rsa(ano_file_path_2013, formats.ano_2013_format, rsa_file_path_2013, formats.rsa_2013_format, inclusion_anos_set=test_anos)
+test_s_X, test_s_y = pmsi_tools.get_sparse_X_y_from_data(test_result_dict)

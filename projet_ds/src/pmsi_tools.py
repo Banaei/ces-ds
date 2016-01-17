@@ -8,6 +8,11 @@ from random import random
 import formats
 import imp
 import pickle
+import random as rnd
+import numpy as np
+from scipy import sparse
+from scipy.sparse import hstack, vstack
+
 imp.reload(formats)
 
 #####################################
@@ -37,7 +42,7 @@ codes_complexity_ghm_list = list()
 codes_cmd_list = list()
 codes_departement_list = list()
 codes_type_ghm_list = list()
-column_label_dict = {}
+column_label_list = list()
 
 
 
@@ -60,7 +65,6 @@ def fill_codes(codes_file_path, codes_list):
     codes_list.sort()
     
 def create_column_labels():
-    column_label_list = list()
     column_label_list.append('sex')
     column_label_list.append('age')
     column_label_list.append('stay_length')
@@ -80,14 +84,11 @@ def create_column_labels():
         column_label_list.append('das_' + das)
     for acte in codes_ccam_list:
         column_label_list.append('acte_' + acte)
-    i = 0
-    for label in column_label_list:
-        column_label_dict[label] = i
-        i += 1
         
         
     
 def init():
+    
     del codes_ghm_list[:]
     del codes_ccam_list[:]
     del codes_cim_list[:]
@@ -96,6 +97,8 @@ def init():
     del codes_cmd_list[:]
     del codes_departement_list[:]
     del codes_type_ghm_list[:]
+    del column_label_list[:]
+    
     fill_codes(codes_ghm_file_path, codes_ghm_list)
     fill_codes(codes_cim_file_path, codes_cim_list)
     fill_codes(codes_ccam_file_path, codes_ccam_list)
@@ -284,7 +287,34 @@ def get_rsa_data(rsa, rsa_format):
     'rehosp':0,
      }
     
-def sample_ano_rsa(ano_file_path, ano_format, rsa_file_path, rsa_format, sampling_proportion, result_file_path=None, limit=None):
+    
+    
+def rand_select_anos(ano_file_path, ano_format, sampling_proportion, sampling_limit=None, exclusion_set=None):
+    anos_set = set()
+    
+    with open(ano_file_path) as ano_file:
+        
+        line_number = 0
+        
+        for ano_line in ano_file:
+            if is_ano_ok(ano_line, ano_format):
+                ano_hash = ano_line[ano_format['ano_sp'] - 1:ano_format['ano_ep']]
+                if (exclusion_set != None) and (ano_hash in exclusion_set):
+                    pass
+                else:
+                    if (random() < sampling_proportion):
+                        anos_set.add(ano_hash)
+            if line_number % 100000 == 0:
+                    print '\rPorcessed ', line_number, 'taken', len(anos_set),
+            line_number += 1
+
+    if (sampling_limit == None):
+        return anos_set
+    else:
+        return rnd.sample(anos_set, sampling_limit)
+    
+    
+def sample_ano_rsa(ano_file_path, ano_format, rsa_file_path, rsa_format, inclusion_anos_set, exclusion_anos_set=None, result_file_path=None):
     """
     Lit simultanemant un fichier ano et un fichier rsa, ligne par ligne. Si le rsa e l'ano sont OK, il les selectionne
     avec la probabilite sapmling_proportion.
@@ -303,7 +333,9 @@ def sample_ano_rsa(ano_file_path, ano_format, rsa_file_path, rsa_format, samplin
                 ano_line = ano_file.readline()
                 if is_ano_ok(ano_line, ano_format) and is_rsa_ok(rsa_line, rsa_format):
                     ano_hash = ano_line[ano_format['ano_sp'] - 1:ano_format['ano_ep']]
-                    if (ano_hash not in result_dict) and (random() > sampling_proportion):
+                    if (exclusion_anos_set != None) and (ano_hash in exclusion_anos_set):
+                        pass
+                    elif (ano_hash not in inclusion_anos_set):
                         pass
                     else:
                         sej_num = int(ano_line[ano_format['sej_num_sp'] - 1:ano_format['sej_num_ep']])
@@ -314,12 +346,11 @@ def sample_ano_rsa(ano_file_path, ano_format, rsa_file_path, rsa_format, samplin
                             rsa_data_dict['sej_num']=sej_num
                             result_dict[ano_hash].append(rsa_data_dict)
                 line_number += 1
-                if line_number % 10000 == 0:
-                    print '\rPorcessed ', line_number, 'taken', len(result_dict)
+                if line_number % 100000 == 0:
+                    print '\rPorcessed ', line_number, 'taken', len(result_dict),
                 if not rsa_line and not ano_line:
                     break
-                if (limit!=None) and (len(result_dict) > limit):
-                    break
+                
     # Tri des patients rehospitalises en fonciton de sej_num
     # Detection d'une rehospit
     for k in result_dict.keys():    
@@ -366,24 +397,52 @@ def get_as_rsa_list(result_dict):
             rsa_list.append(rsa)
     return rsa_list
 
-def rsa_to_X_y(rsa, X, y, i, cld):
-    X[i, cld['sex']]=rsa['sex']
-    X[i, cld['age']]=rsa['age']
-    X[i, cld['stay_length']]=rsa['stay_length']
-    X[i, cld['dpt_' + rsa['dpt']]]=1
-    X[i, cld['type_ghm_' + rsa['type_ghm']]]=1
-    X[i, cld['complexity_ghm_' + rsa['complexity_ghm']]]=1
+def rsa_to_X_y(rsa, X, y, i, cll):
+    X[i, cll.index('sex')]=rsa['sex']
+    X[i, cll.index('age')]=rsa['age']
+    X[i, cll.index('stay_length')]=rsa['stay_length']
+    X[i, cll.index('dpt_' + rsa['dpt'])]=1
+    X[i, cll.index('type_ghm_' + rsa['type_ghm'])]=1
+    X[i, cll.index('complexity_ghm_' + rsa['complexity_ghm'])]=1
     for t_u in rsa['type_um']:
-        X[i, cld['type_um_' + t_u]]=1
-    X[i, cld['dp_' + rsa['dp']]]=1
+        X[i, cll.index('type_um_' + t_u)]=1
+    X[i, cll.index('dp_' + rsa['dp'])]=1
     if (len(rsa['dr'])>0):
-        X[i, cld['dr_' + rsa['dr']]]=1
+        X[i, cll.index('dr_' + rsa['dr'])]=1
     for das in rsa['das']:
-        X[i, cld['das_' + das]]=1
+        X[i, cll.index('das_' + das)]=1
     for acte in rsa['actes']:
-        X[i, cld['acte_' + acte]]=1
+        X[i, cll.index('acte_' + acte)]=1
     y[i] = rsa['rehosp']
 
+
+def get_sparse_X_y_from_data(result_dict):
+    chunk = 1000
+    rsa_list = get_as_rsa_list(result_dict)
+    cols_count = len(column_label_list)
+    rows_count = len(rsa_list)
+    sparse_X = sparse.csr_matrix((0, cols_count))
+    sparse_y = sparse.csr_matrix((0, 1))
+    X = np.zeros((chunk, cols_count))
+    y = np.zeros((chunk, 1))
+    index = 0
+    for row in range(rows_count):
+        if index == chunk:
+            sparse_X = vstack([sparse_X, sparse.csr_matrix(X)])
+            sparse_y = vstack([sparse_y, sparse.csr_matrix(y)])
+            X.fill(0)
+            y.fill(0)
+            index = 0
+        rsa_to_X_y(rsa_list[index], X, y, index, column_label_list)
+        index += 1
+        if (row % 100000 == 0):
+            print 'Processed ', row,
+    if index % chunk != 0:
+        sparse_X = vstack([sparse_X, sparse.csr_matrix(X[0:index, :])])    
+        sparse_y = vstack([sparse_y, sparse.csr_matrix(y[0:index, :])])    
+    return sparse_X, sparse_y
+    
+    
 
 #
 #import numpy as np
