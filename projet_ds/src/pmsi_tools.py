@@ -10,6 +10,7 @@ import imp
 import pickle
 import random as rnd
 import numpy as np
+import pandas as pd
 from scipy import sparse
 from scipy.sparse import hstack, vstack
 
@@ -289,24 +290,27 @@ def get_rsa_data(rsa, rsa_format):
     
     
     
-def rand_select_anos(ano_file_path, ano_format, sampling_proportion, sampling_limit=None, exclusion_set=None):
+def rand_select_anos(ano_file_path, ano_format, rsa_file_path, rsa_format, sampling_proportion, sampling_limit=None, exclusion_set=None):
     anos_set = set()
     
-    with open(ano_file_path) as ano_file:
-        
-        line_number = 0
-        
-        for ano_line in ano_file:
-            if is_ano_ok(ano_line, ano_format):
-                ano_hash = ano_line[ano_format['ano_sp'] - 1:ano_format['ano_ep']]
-                if (exclusion_set != None) and (ano_hash in exclusion_set):
-                    pass
-                else:
-                    if (random() < sampling_proportion):
-                        anos_set.add(ano_hash)
-            if line_number % 100000 == 0:
-                    print '\rPorcessed ', line_number, 'taken', len(anos_set),
-            line_number += 1
+    with open(rsa_file_path) as rsa_file:
+        with open(ano_file_path) as ano_file:
+            line_number = 0
+            while True:
+                rsa_line = rsa_file.readline()
+                ano_line = ano_file.readline()
+                if is_ano_ok(ano_line, ano_format) and is_rsa_ok(rsa_line, rsa_format):
+                    ano_hash = ano_line[ano_format['ano_sp'] - 1:ano_format['ano_ep']]
+                    if (exclusion_set != None) and (ano_hash in exclusion_set):
+                        pass
+                    else:
+                        if (random() < sampling_proportion):
+                            anos_set.add(ano_hash)
+                if line_number % 100000 == 0:
+                        print '\rPorcessed ', line_number, 'taken', len(anos_set),
+                line_number += 1
+                if not rsa_line and not ano_line:
+                    break
 
     if (sampling_limit == None):
         return anos_set
@@ -387,15 +391,27 @@ def load_selected_ano_hashes(selected_ano_hashes_file_path):
     return result
 
 
-def get_as_rsa_list(result_dict):
+def get_as_rsa_list(result_dict, print_stats=True):
     """
     Retourne une liste de RSA a partir d'un result_dict (retourne par la methode sample_ano_rsa)
     """
     rsa_list = list()
+    rehosps_count = 0
     for k in result_dict.keys():
         for rsa in result_dict[k]:
             rsa_list.append(rsa)
+            if rsa['rehosp']==1:
+                rehosps_count += 1
+    if (print_stats):
+        print '***************************************'
+        print '       Statistices on selected RSAS    '
+        print '***************************************'
+        print 'Patients count = ', len(result_dict)
+        print 'RSAs count = ', len(rsa_list)
+        print 'Rehosps count = ', rehosps_count
+        print '***************************************'
     return rsa_list
+            
 
 def rsa_to_X_y(rsa, X, y, i, cll):
     X[i, cll.index('sex')]=rsa['sex']
@@ -417,32 +433,21 @@ def rsa_to_X_y(rsa, X, y, i, cll):
 
 
 def get_sparse_X_y_from_data(result_dict):
-    chunk = 1000
     rsa_list = get_as_rsa_list(result_dict)
     cols_count = len(column_label_list)
     rows_count = len(rsa_list)
-    sparse_X = sparse.csr_matrix((0, cols_count))
-    sparse_y = sparse.csr_matrix((0, 1))
-    X = np.zeros((chunk, cols_count))
-    y = np.zeros((chunk, 1))
+    sparse_X = sparse.lil_matrix((rows_count, cols_count))
+    sparse_y = sparse.lil_matrix((rows_count, 1))
     index = 0
     for row in range(rows_count):
-        if index == chunk:
-            sparse_X = vstack([sparse_X, sparse.csr_matrix(X)])
-            sparse_y = vstack([sparse_y, sparse.csr_matrix(y)])
-            X.fill(0)
-            y.fill(0)
-            index = 0
-        rsa_to_X_y(rsa_list[index], X, y, index, column_label_list)
+        rsa_to_X_y(rsa_list[index], sparse_X, sparse_y, index, column_label_list)
         index += 1
-        if (row % 100000 == 0):
-            print 'Processed ', row,
-    if index % chunk != 0:
-        sparse_X = vstack([sparse_X, sparse.csr_matrix(X[0:index, :])])    
-        sparse_y = vstack([sparse_y, sparse.csr_matrix(y[0:index, :])])    
+        if index % 1000 == 0:
+            print '\rSparse processed ', index,    
     return sparse_X, sparse_y
     
-    
+
+
 
 #
 #import numpy as np
