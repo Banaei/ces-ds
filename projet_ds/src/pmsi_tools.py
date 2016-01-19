@@ -111,6 +111,13 @@ def init():
     create_column_labels()
 
     
+def save_sparse(filename, array):
+    np.savez(filename, data=array.data, indices=array.indices, indptr=array.indptr, shape=array.shape)
+
+
+def load_sparse(filename):
+    loader = np.load(filename)
+    return sparse.csr_matrix((loader['data'], loader['indices'], loader['indptr']), shape=loader['shape'])
 
 
 #############  Check functions
@@ -159,7 +166,8 @@ def is_rsa_ok(line, rsa_format):
     mode_sortie_dc = 1 * (line[rsa_format['mode_sortie_sp'] - 1:rsa_format['mode_sortie_ep']].strip() == formats.dead_patient_code)
     cmd_90 = 1 * (line[rsa_format['cmd_sp'] - 1:rsa_format['cmd_ep']].strip() == formats.cmd_90_code)
     cmd_28 = 1 * (line[rsa_format['cmd_sp'] - 1:rsa_format['cmd_ep']].strip() == formats.cmd_28_code)
-    return mode_sortie_dc + cmd_90 + cmd_28 == 0
+
+    return (mode_sortie_dc + cmd_90 + cmd_28) == 0
 
 
 
@@ -168,7 +176,7 @@ def is_rsa_ok(line, rsa_format):
 
 
    
-def get_rsa_data(rsa, rsa_format):
+def get_rsa_data(rsa, rsa_format, verbose=None):
     
     error = False
     
@@ -180,22 +188,26 @@ def get_rsa_data(rsa, rsa_format):
     
     departement = rsa[rsa_format['finess_sp']:rsa_format['finess_sp']+2].strip()
     if (not check_code(departement, departement=True)):
-        print 'Error in departement %s, RSA ignored' % (departement)
+        if verbose:
+            print 'Error in departement %s, RSA ignored' % (departement)
         error = True
         
     cmd = rsa[rsa_format['cmd_sp'] - 1:rsa_format['cmd_ep']].strip()
     if (not check_code(cmd, cmd=True)):
-        print 'Error in CMD %s, RSA ignored' % (cmd)
+        if verbose:
+            print 'Error in CMD %s, RSA ignored' % (cmd)
         error = True
     
     dp = rsa[rsa_format['dp_sp'] - 1:rsa_format['dp_ep']].strip()
     if (not check_code(dp, cim=True)):
-        print 'Error in DP %s, RSA ignored' % (dp)
+        if verbose:
+            print 'Error in DP %s, RSA ignored' % (dp)
         error = True
         
     dr = rsa[rsa_format['dr_sp'] - 1:rsa_format['dr_ep']].strip()
     if (len(dr)>0) and (not check_code(dr, cim=True)):
-        print 'Error in DR %s, RSA ignored' % (dr)
+        if verbose:
+            print 'Error in DR %s, RSA ignored' % (dr)
         error = True
 
     try:
@@ -207,12 +219,14 @@ def get_rsa_data(rsa, rsa_format):
     
     type_ghm = rsa[rsa_format['type_ghm_sp']-1:rsa_format['type_ghm_ep']].strip()
     if (not check_code(type_ghm, type_ghm=True)):
-        print 'Error in TYPE GHM %s, RSA ignored' % (type_ghm)
+        if verbose:
+            print 'Error in TYPE GHM %s, RSA ignored' % (type_ghm)
         error = True
     
     complexity_ghm = rsa[rsa_format['complexity_ghm_sp']-1:rsa_format['complexity_ghm_ep']].strip()
     if (not check_code(complexity_ghm, complexity_ghm=True)):
-        print 'Error in COMPLEXITY OF GHM %s, RSA ignored' % (complexity_ghm)
+        if verbose:
+            print 'Error in COMPLEXITY OF GHM %s, RSA ignored' % (complexity_ghm)
         error = True
     
     fixed_zone_length = int(rsa_format['fix_zone_length'])
@@ -233,7 +247,8 @@ def get_rsa_data(rsa, rsa_format):
     
     rsa_length = fixed_zone_length + nb_aut_pgv*aut_pgv_length + nb_suppl_radio*suppl_radio_length+nb_rum*rum_length + nb_das*das_length + nb_zones_actes*zone_acte_length
     if (len(rsa)!=rsa_length):
-        print 'The RSA length ' + str(len(rsa)) + ' is different from calculated lentgh ' + str(rsa_length) + " >" + rsa + '<'
+        if verbose:
+            print 'The RSA length ' + str(len(rsa)) + ' is different from calculated lentgh ' + str(rsa_length) + " >" + rsa + '<'
         error = True
     
     first_um_sp = fixed_zone_length + (nb_aut_pgv * aut_pgv_length) + (nb_suppl_radio * suppl_radio_length) + type_um_offset
@@ -242,7 +257,8 @@ def get_rsa_data(rsa, rsa_format):
     for i in range(0, nb_rum):
         type_um = rsa[first_um_sp: first_um_sp + type_um_length].strip()
         if (not check_code(type_um, type_um=True)):
-            print 'Error in TYPE UM %s' % (type_um)
+            if verbose:
+                print 'Error in TYPE UM %s' % (type_um)
             error = True
         else:
             type_um_dict[type_um] = 1
@@ -253,7 +269,8 @@ def get_rsa_data(rsa, rsa_format):
     for i in range(0, nb_das):
         das = rsa[first_das_sp : first_das_sp + das_length].strip()
         if (not check_code(das, cim=True)):
-            print 'Error in DAS %s' % (das)
+            if verbose:
+                    print 'Error in DAS %s' % (das)
             error = True
         else:
             das_dict[das] = 1
@@ -265,7 +282,8 @@ def get_rsa_data(rsa, rsa_format):
     for i in range(0, nb_zones_actes):
         acte = rsa[first_act_sp : first_act_sp + code_ccam_length].strip()
         if (not check_code(acte, ccam=True)):
-            print 'Error in ACTE %s' % (acte)
+            if verbose:
+                    print 'Error in ACTE %s' % (acte)
             error = True
         else:
             actes_dict[acte] = 1
@@ -301,6 +319,15 @@ def rand_select_anos(ano_file_path, ano_format, rsa_file_path, rsa_format, sampl
                 ano_line = ano_file.readline()
                 if is_ano_ok(ano_line, ano_format) and is_rsa_ok(rsa_line, rsa_format):
                     ano_hash = ano_line[ano_format['ano_sp'] - 1:ano_format['ano_ep']]
+                    ano_index = int(ano_line[ano_format['rsa_index_sp'] - 1:ano_format['rsa_index_sp']].strip())
+                    rsa_index = int(rsa_line[rsa_format['index_sp'] - 1:rsa_format['index_sp']].strip())
+                    if (ano_index != rsa_index):
+                        print '*****************************************************'
+                        print '*****************************************************'
+                        print ' GRAVE : ANO and RSA inndexes are not the same.'
+                        print '*****************************************************'
+                        print '*****************************************************'
+                        raise Exception('GRAVE : ANO and RSA inndexes are not the same')
                     if (exclusion_set != None) and (ano_hash in exclusion_set):
                         pass
                     else:
@@ -311,6 +338,13 @@ def rand_select_anos(ano_file_path, ano_format, rsa_file_path, rsa_format, sampl
                 line_number += 1
                 if not rsa_line and not ano_line:
                     break
+
+    print '\n********************************'
+    print 'Sampling ANOs statistics:'            
+    print 'Total processed =', line_number            
+    print 'Total taken =', len(anos_set)            
+    print 'Sampling proportion =', sampling_proportion            
+    print '********************************'
 
     if (sampling_limit == None):
         return anos_set
@@ -330,6 +364,8 @@ def sample_ano_rsa(ano_file_path, ano_format, rsa_file_path, rsa_format, inclusi
     """
     result_dict = {}
     line_number = 0
+    errors_count = 0
+    rsas_count = 0
     with open(rsa_file_path) as rsa_file:
         with open(ano_file_path) as ano_file:
             while True:
@@ -349,12 +385,21 @@ def sample_ano_rsa(ano_file_path, ano_format, rsa_file_path, rsa_format, inclusi
                         if not error:
                             rsa_data_dict['sej_num']=sej_num
                             result_dict[ano_hash].append(rsa_data_dict)
+                            rsas_count += 1
+                        else:
+                            errors_count += 1
                 line_number += 1
                 if line_number % 100000 == 0:
-                    print '\rPorcessed ', line_number, 'taken', len(result_dict),
+                    print '\rPorcessed ', line_number, 'taken', rsas_count, 'errors', errors_count,
                 if not rsa_line and not ano_line:
                     break
-                
+    print '\n********************************'
+    print 'RSAs collect statistics:'            
+    print 'Total processed lines =', line_number            
+    print 'Total errors =', errors_count            
+    print 'Total RSAs =', rsas_count            
+    print 'Total patients =', len(result_dict)            
+    print '********************************'
     # Tri des patients rehospitalises en fonciton de sej_num
     # Detection d'une rehospit
     for k in result_dict.keys():    
@@ -404,8 +449,7 @@ def get_as_rsa_list(result_dict, print_stats=True):
                 rehosps_count += 1
     if (print_stats):
         print '***************************************'
-        print '       Statistices on selected RSAS    '
-        print '***************************************'
+        print 'Statistices on selected RSAS:'
         print 'Patients count = ', len(result_dict)
         print 'RSAs count = ', len(rsa_list)
         print 'Rehosps count = ', rehosps_count
