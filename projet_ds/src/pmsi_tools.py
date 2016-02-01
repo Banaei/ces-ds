@@ -307,6 +307,87 @@ def get_rsa_data(rsa, rsa_format, verbose=None):
      }
     
     
+def generate_clean_files(ano_in_file_path, rsa_in_file_path, ano_out_file_path, rsa_out_file_path, ano_format, rsa_format):
+    """
+    Parcourt les fichiers ANO et RSA, supprime toutes les lignes correspondant aux RSA et ANO en erreur et ecrit les fichiers propres
+    dans les out file
+    """
+    with open(rsa_in_file_path) as rsa_file:
+        with open(ano_in_file_path) as ano_file:
+            with open(ano_out_file_path, 'w') as ano_out_file:
+                with open(rsa_out_file_path, 'w') as rsa_out_file:
+                    line_number = 0
+                    taken = 0
+                    while True:
+                        rsa_line = rsa_file.readline()
+                        ano_line = ano_file.readline()
+                        if is_ano_ok(ano_line, ano_format) and is_rsa_ok(rsa_line, rsa_format):
+                            ano_index = int(ano_line[ano_format['rsa_index_sp'] - 1:ano_format['rsa_index_sp']].strip())
+                            rsa_index = int(rsa_line[rsa_format['index_sp'] - 1:rsa_format['index_sp']].strip())
+                            if (ano_index != rsa_index):
+                                print '*****************************************************'
+                                print '*****************************************************'
+                                print ' GRAVE : ANO and RSA inndexes are not the same.'
+                                print '*****************************************************'
+                                print '*****************************************************'
+                                raise Exception('GRAVE : ANO and RSA inndexes are not the same')
+                            error, rsa_data_dict = get_rsa_data(rsa_line, rsa_format)
+                            if not error:
+                                ano_out_file.write(ano_line)
+                                rsa_out_file.write(rsa_line)
+                                taken += 1
+                        if line_number % 10000 == 0:
+                                print '\rPorcessed ', line_number, 'taken', taken,
+                        line_number += 1
+                        if not rsa_line and not ano_line:
+                            break
+
+    print '\n********************************'
+    print 'Celaning statistics:'            
+    print 'Total processed =', line_number            
+    print 'Total taken =', taken            
+    print '********************************'
+    
+
+def detect_rehosps(ano_file_path, ano_format):
+    result_dict = {}
+    line_number = 0
+    rehosps_list = list()
+    with open(ano_file_path) as ano_file:
+        while True:
+            ano_line = ano_file.readline()
+            ano_hash = ano_line[ano_format['ano_sp'] - 1:ano_format['ano_ep']]
+            rsa_index = int(ano_line[ano_format['rsa_index_sp'] - 1:ano_format['rsa_index_sp']].strip())
+            sej_num = int(ano_line[ano_format['sej_num_sp'] - 1:ano_format['sej_num_ep']])           
+            if (ano_hash not in result_dict):
+                result_dict[ano_hash]=list()
+            result_dict[ano_hash].append({'sej_num':sej_num, 'rsa_index':rsa_index})
+            if not ano_line:
+                break
+            if line_number % 100000 == 0:
+                    print '\rGetting sej_num, processed ', line_number, 
+            
+    line_number = 0
+    for k in result_dict.keys():    
+        if (len(result_dict[k])>1):
+            result_dict[k].sort(key=lambda x:x['sej_num'])
+            first_loop = True
+            last_sej_num = 0
+            current_sej_num = 0
+            for i in range(len(result_dict[k])-1,-1,-1):
+                if (first_loop):
+                    last_sej_num = result_dict[k][i]['sej_num']
+                    first_loop = False
+                    continue
+                else:
+                    current_sej_num = result_dict[k][i]['sej_num']
+                    if (last_sej_num - current_sej_num) <= delai_rehosp:
+                        rehosps_list.append(result_dict[k][i]['rsa_index'])
+                last_sej_num = current_sej_num
+                if line_number % 100000 == 0:
+                        print '\rRehosp detection : processed ', line_number, 
+            
+            
     
 def rand_select_anos(ano_file_path, ano_format, rsa_file_path, rsa_format, sampling_proportion, sampling_limit=None, exclusion_set=None):
     anos_set = set()
