@@ -4,7 +4,7 @@
 Created on Sun Jan 10
 @author: Alireza BANAEI
 """
-from random import random
+from random import random, choice
 import formats
 import imp
 import pickle
@@ -356,20 +356,19 @@ def detect_rehosps(ano_file_path, ano_format, rehosps_file_path):
     with open(ano_file_path) as ano_file:
         while True:
             ano_line = ano_file.readline()
-            if (len(ano_line.strip())==0):
-                continue
-            ano_hash = ano_line[ano_format['ano_sp'] - 1:ano_format['ano_ep']]
-            rsa_index = int(ano_line[ano_format['rsa_index_sp'] - 1:ano_format['rsa_index_ep']].strip())
-            sej_num = int(ano_line[ano_format['sej_num_sp'] - 1:ano_format['sej_num_ep']])           
-            if (ano_hash not in result_dict):
-                result_dict[ano_hash]=list()
-            result_dict[ano_hash].append({'sej_num':sej_num, 'rsa_index':rsa_index})
+            if (len(ano_line.strip())>0):
+                ano_hash = ano_line[ano_format['ano_sp'] - 1:ano_format['ano_ep']]
+                rsa_index = int(ano_line[ano_format['rsa_index_sp'] - 1:ano_format['rsa_index_ep']].strip())
+                sej_num = int(ano_line[ano_format['sej_num_sp'] - 1:ano_format['sej_num_ep']])           
+                if (ano_hash not in result_dict):
+                    result_dict[ano_hash]=list()
+                result_dict[ano_hash].append({'sej_num':sej_num, 'rsa_index':rsa_index})
             if not ano_line:
                 break
             if line_number % 100000 == 0:
                     print '\rGetting sej_num, processed ', line_number, 
             line_number += 1
-    print 'Results dict length ' + len(result_dict)
+    print 'Results dict length ' + str(len(result_dict))
     print 'Starting rehosps detection ...'
     line_number = 0
     for k in result_dict.keys():    
@@ -391,12 +390,67 @@ def detect_rehosps(ano_file_path, ano_format, rehosps_file_path):
         if line_number % 100000 == 0:
                 print '\rRehosp detection : processed ', line_number, 
         line_number += 1
-
-    pickle.dump(rehosps_list, rehosps_file_path)
+    with open(rehosps_file_path, 'w') as out_file:
+        pickle.dump(rehosps_list, out_file)
     print 'Rehosps saved to ' + rehosps_file_path
     return rehosps_list
-            
+
+
+def load_rehosps_list(rehosps_list_file_path):            
+    with open(rehosps_list_file_path) as rehosps_file:
+        return pickle.load(rehosps_file)
+        
+def check_one_rehosp(rehosps_list, ano_file_path, ano_format):
     
+    this_index = choice(rehosps_list)
+    this_sej_num = 0
+    this_ano_hash = ''
+    index_found = False
+    hash_found = False
+    rehosp_found = False
+    print 'looking for sej ', this_index
+    with open(ano_file_path) as ano_file:
+        while True:
+            ano_line = ano_file.readline()
+            if (len(ano_line.strip())>0):
+                index = int(ano_line[ano_format['rsa_index_sp'] - 1:ano_format['rsa_index_ep']].strip())
+                if (index == this_index):
+                    print 'index found !'
+                    index_found = True
+                    this_sej_num = int(ano_line[ano_format['sej_num_sp'] - 1:ano_format['sej_num_ep']])
+                    this_ano_hash = ano_line[ano_format['ano_sp'] - 1:ano_format['ano_ep']]
+                    break
+            if (not ano_line):
+                break
+    if (not index_found):
+        print 'index not found !! :('
+        return
+    print 'Looking for hash ' + this_ano_hash
+    with open(ano_file_path) as ano_file:
+        while True:
+            ano_line = ano_file.readline()
+            if (len(ano_line.strip())>0):
+                ano_hash = ano_line[ano_format['ano_sp'] - 1:ano_format['ano_ep']]
+                if (ano_hash == this_ano_hash):
+                    print 'Hash found !'
+                    sej_num = int(ano_line[ano_format['sej_num_sp'] - 1:ano_format['sej_num_ep']])
+                    if (sej_num - this_sej_num)<= delai_rehosp:
+                        print 'Rehosp found !'
+                        rehosp_found = True
+                        return True
+            if (not ano_line):
+                break
+        if (not rehosp_found):
+            print 'Rehosp not found'
+        return False
+
+def check_rehosps(rehosps_list_file_path, ano_file_path, ano_format, sample_size):
+    rehosps_list = load_rehosps_list(rehosps_list_file_path)
+    for i in range(sample_size):
+        print 'Process ', str(i),  check_one_rehosp(rehosps_list, ano_file_path, ano_format)
+        
+        
+        
 def rand_select_anos(ano_file_path, ano_format, rsa_file_path, rsa_format, sampling_proportion, sampling_limit=None, exclusion_set=None):
     anos_set = set()
     
