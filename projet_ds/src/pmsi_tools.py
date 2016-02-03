@@ -322,8 +322,8 @@ def generate_clean_files(ano_in_file_path, rsa_in_file_path, ano_out_file_path, 
                         rsa_line = rsa_file.readline()
                         ano_line = ano_file.readline()
                         if is_ano_ok(ano_line, ano_format) and is_rsa_ok(rsa_line, rsa_format):
-                            ano_index = int(ano_line[ano_format['rsa_index_sp'] - 1:ano_format['rsa_index_sp']].strip())
-                            rsa_index = int(rsa_line[rsa_format['index_sp'] - 1:rsa_format['index_sp']].strip())
+                            ano_index = int(ano_line[ano_format['rsa_index_sp'] - 1:ano_format['rsa_index_ep']].strip())
+                            rsa_index = int(rsa_line[rsa_format['index_sp'] - 1:rsa_format['index_ep']].strip())
                             if (ano_index != rsa_index):
                                 print '*****************************************************'
                                 print '*****************************************************'
@@ -349,15 +349,17 @@ def generate_clean_files(ano_in_file_path, rsa_in_file_path, ano_out_file_path, 
     print '********************************'
     
 
-def detect_rehosps(ano_file_path, ano_format):
+def detect_rehosps(ano_file_path, ano_format, rehosps_file_path):
     result_dict = {}
     line_number = 0
     rehosps_list = list()
     with open(ano_file_path) as ano_file:
         while True:
             ano_line = ano_file.readline()
+            if (len(ano_line.strip())==0):
+                continue
             ano_hash = ano_line[ano_format['ano_sp'] - 1:ano_format['ano_ep']]
-            rsa_index = int(ano_line[ano_format['rsa_index_sp'] - 1:ano_format['rsa_index_sp']].strip())
+            rsa_index = int(ano_line[ano_format['rsa_index_sp'] - 1:ano_format['rsa_index_ep']].strip())
             sej_num = int(ano_line[ano_format['sej_num_sp'] - 1:ano_format['sej_num_ep']])           
             if (ano_hash not in result_dict):
                 result_dict[ano_hash]=list()
@@ -366,7 +368,9 @@ def detect_rehosps(ano_file_path, ano_format):
                 break
             if line_number % 100000 == 0:
                     print '\rGetting sej_num, processed ', line_number, 
-            
+            line_number += 1
+    print 'Results dict length ' + len(result_dict)
+    print 'Starting rehosps detection ...'
     line_number = 0
     for k in result_dict.keys():    
         if (len(result_dict[k])>1):
@@ -384,9 +388,13 @@ def detect_rehosps(ano_file_path, ano_format):
                     if (last_sej_num - current_sej_num) <= delai_rehosp:
                         rehosps_list.append(result_dict[k][i]['rsa_index'])
                 last_sej_num = current_sej_num
-                if line_number % 100000 == 0:
-                        print '\rRehosp detection : processed ', line_number, 
-            
+        if line_number % 100000 == 0:
+                print '\rRehosp detection : processed ', line_number, 
+        line_number += 1
+
+    pickle.dump(rehosps_list, rehosps_file_path)
+    print 'Rehosps saved to ' + rehosps_file_path
+    return rehosps_list
             
     
 def rand_select_anos(ano_file_path, ano_format, rsa_file_path, rsa_format, sampling_proportion, sampling_limit=None, exclusion_set=None):
