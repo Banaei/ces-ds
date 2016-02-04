@@ -9,6 +9,7 @@ Addind this line to test GitHub
 import formats
 import pmsi_tools
 import imp
+import numpy as np
 imp.reload(pmsi_tools)
 imp.reload(formats)
 
@@ -19,6 +20,10 @@ ano_clean_file_path_2013 = '/DS/data/pmsi/ano13.clean.txt'
 rsa_clean_file_path_2013 = '/DS/data/pmsi/rsa13.clean.txt'
 selected_ano_hashes_file_path = '/DS/data/pmsi/selected_ano_hash.txt'
 rehosps_list_file_path = '/DS/data/pmsi/rehosps_list.txt'
+
+ano_test_fp = '/DS/data/pmsi/ano.test'
+rsa_test_fp = '/DS/data/pmsi/rsa.test'
+
 training_sample_proportion = 0.01
 validation_sapmle_proportion = 0.05
 
@@ -45,4 +50,18 @@ pmsi_tools.save_sparse(y_2_fil_path, vaidation_s_y.tocsr())
 
 pmsi_tools.generate_clean_files(ano_file_path_2013, rsa_file_path_2013, ano_clean_file_path_2013, rsa_clean_file_path_2013, formats.ano_2013_format, formats.rsa_2013_format )
 pmsi_tools.detect_rehosps(ano_clean_file_path_2013, formats.ano_2013_format, rehosps_list_file_path)
-pmsi_tools.check_rehosps(rehosps_list_file_path, ano_clean_file_path_2013, formats.ano_2013_format, 3)
+pmsi_tools.check_rehosps(rehosps_list_file_path, ano_clean_file_path_2013, formats.ano_2013_format, 200)
+
+rehosps_list = pmsi_tools.load_rehosps_list(rehosps_list_file_path)
+
+delays = np.zeros((len(rehosps_list),1))
+i=0
+for l in rehosps_list:
+    delays[i]=l[2]
+    i+=1
+    
+import matplotlib.pyplot as plt
+xbins=range(0,8)
+plt.hist(delays, bins=xbins, color='blue')
+plt.show()
+    

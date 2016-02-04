@@ -13,6 +13,7 @@ import numpy as np
 import pandas as pd
 from scipy import sparse
 from scipy.sparse import hstack, vstack
+import math
 
 imp.reload(formats)
 
@@ -371,22 +372,25 @@ def detect_rehosps(ano_file_path, ano_format, rehosps_file_path):
     print 'Results dict length ' + str(len(result_dict))
     print 'Starting rehosps detection ...'
     line_number = 0
-    for k in result_dict.keys():    
+    for k in result_dict.keys():
         if (len(result_dict[k])>1):
-            result_dict[k].sort(key=lambda x:x['sej_num'])
+            result_dict[k].sort(key=lambda x:x['sej_num'], reverse=True)
             first_loop = True
             last_sej_num = 0
             current_sej_num = 0
-            for i in range(len(result_dict[k])-1,-1,-1):
+            for i in range(0,len(result_dict[k])):
                 if (first_loop):
                     last_sej_num = result_dict[k][i]['sej_num']
                     first_loop = False
                     continue
                 else:
                     current_sej_num = result_dict[k][i]['sej_num']
-                    if (last_sej_num - current_sej_num) <= delai_rehosp:
-                        rehosps_list.append(result_dict[k][i]['rsa_index'])
-                last_sej_num = current_sej_num
+                    if (last_sej_num < current_sej_num):
+                        raise Exception('Error sorting the list') 
+                    delay = last_sej_num - current_sej_num
+                    if delay <= delai_rehosp:
+                        rehosps_list.append([k, result_dict[k][i]['rsa_index'], delay])
+                    last_sej_num = current_sej_num
         if line_number % 100000 == 0:
                 print '\rRehosp detection : processed ', line_number, 
         line_number += 1
@@ -400,49 +404,59 @@ def load_rehosps_list(rehosps_list_file_path):
     with open(rehosps_list_file_path) as rehosps_file:
         return pickle.load(rehosps_file)
         
-def check_one_rehosp(rehosps_list, ano_file_path, ano_format):
+def check_one_rehosp(rehosps_list, ano_file_path, ano_format, index_p=None, ano_hash_p=None, verbose=False):
     
-    this_index = choice(rehosps_list)
+    if (index_p!=None):
+        this_index = index_p
+        this_ano_hash = ano_hash_p
+    else:
+        chosen = choice(rehosps_list)
+        this_index = chosen[1]
+        this_ano_hash = chosen[0]
     this_sej_num = 0
-    this_ano_hash = ''
     index_found = False
-    hash_found = False
     rehosp_found = False
-    print 'looking for sej ', this_index
+    if verbose:
+        print 'looking for sej ', this_index, ' and ano_hash ', this_ano_hash
     with open(ano_file_path) as ano_file:
         while True:
             ano_line = ano_file.readline()
             if (len(ano_line.strip())>0):
                 index = int(ano_line[ano_format['rsa_index_sp'] - 1:ano_format['rsa_index_ep']].strip())
-                if (index == this_index):
-                    print 'index found !'
+                ano_hash = ano_line[ano_format['ano_sp'] - 1:ano_format['ano_ep']]
+                if (index == this_index) and (ano_hash == this_ano_hash):
+                    if verbose:
+                        print '>>>>> Index found : ' + ano_line
                     index_found = True
                     this_sej_num = int(ano_line[ano_format['sej_num_sp'] - 1:ano_format['sej_num_ep']])
-                    this_ano_hash = ano_line[ano_format['ano_sp'] - 1:ano_format['ano_ep']]
                     break
             if (not ano_line):
                 break
     if (not index_found):
-        print 'index not found !! :('
+        if verbose:
+            print 'index not found !! :('
         return
-    print 'Looking for hash ' + this_ano_hash
+    if verbose:
+            print 'Looking for hash ' + this_ano_hash + ' for sej_num ' + str(this_sej_num)
     with open(ano_file_path) as ano_file:
         while True:
             ano_line = ano_file.readline()
             if (len(ano_line.strip())>0):
                 ano_hash = ano_line[ano_format['ano_sp'] - 1:ano_format['ano_ep']]
                 if (ano_hash == this_ano_hash):
-                    print 'Hash found !'
-                    sej_num = int(ano_line[ano_format['sej_num_sp'] - 1:ano_format['sej_num_ep']])
-                    if (sej_num - this_sej_num)<= delai_rehosp:
-                        print 'Rehosp found !'
-                        rehosp_found = True
-                        return True
+                    index = int(ano_line[ano_format['rsa_index_sp'] - 1:ano_format['rsa_index_ep']].strip())
+                    if (index != this_index):
+                        sej_num = int(ano_line[ano_format['sej_num_sp'] - 1:ano_format['sej_num_ep']])
+                        if (sej_num >= this_sej_num) and ((sej_num - this_sej_num) <= delai_rehosp):
+                            if verbose:
+                                print '>>>>> Rehosp found : ' + ano_line
+                            rehosp_found = True
+                            return True
             if (not ano_line):
                 break
-        if (not rehosp_found):
-            print 'Rehosp not found'
-        return False
+    if (not rehosp_found):
+        print 'Rehosp not found'
+    return False
 
 def check_rehosps(rehosps_list_file_path, ano_file_path, ano_format, sample_size):
     rehosps_list = load_rehosps_list(rehosps_list_file_path)
