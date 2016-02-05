@@ -10,7 +10,7 @@ import imp
 import pickle
 import random as rnd
 import numpy as np
-import pandas as pd
+import linecache
 from scipy import sparse
 from scipy.sparse import hstack, vstack
 import math
@@ -22,7 +22,7 @@ imp.reload(formats)
 #####################################
 
 # Delais en jours entre deux hospitalisations pour que ca puisse etre considere comme une rehospit
-delai_rehosp = 7
+delai_rehosp = 180
 
 
 codes_ghm_file_path = '../data/codes_ghm.txt'
@@ -352,18 +352,18 @@ def generate_clean_files(ano_in_file_path, rsa_in_file_path, ano_out_file_path, 
 
 def detect_rehosps(ano_file_path, ano_format, rehosps_file_path):
     result_dict = {}
-    line_number = 0
+    line_number = 1
     rehosps_list = list()
     with open(ano_file_path) as ano_file:
         while True:
             ano_line = ano_file.readline()
             if (len(ano_line.strip())>0):
                 ano_hash = ano_line[ano_format['ano_sp'] - 1:ano_format['ano_ep']]
-                rsa_index = int(ano_line[ano_format['rsa_index_sp'] - 1:ano_format['rsa_index_ep']].strip())
+#                rsa_index = int(ano_line[ano_format['rsa_index_sp'] - 1:ano_format['rsa_index_ep']].strip())
                 sej_num = int(ano_line[ano_format['sej_num_sp'] - 1:ano_format['sej_num_ep']])           
                 if (ano_hash not in result_dict):
                     result_dict[ano_hash]=list()
-                result_dict[ano_hash].append({'sej_num':sej_num, 'rsa_index':rsa_index})
+                result_dict[ano_hash].append({'sej_num':sej_num, 'line_number':line_number})
             if not ano_line:
                 break
             if line_number % 100000 == 0:
@@ -371,7 +371,7 @@ def detect_rehosps(ano_file_path, ano_format, rehosps_file_path):
             line_number += 1
     print 'Results dict length ' + str(len(result_dict))
     print 'Starting rehosps detection ...'
-    line_number = 0
+    line_number = 1
     for k in result_dict.keys():
         if (len(result_dict[k])>1):
             result_dict[k].sort(key=lambda x:x['sej_num'], reverse=True)
@@ -389,7 +389,7 @@ def detect_rehosps(ano_file_path, ano_format, rehosps_file_path):
                         raise Exception('Error sorting the list') 
                     delay = last_sej_num - current_sej_num
                     if delay <= delai_rehosp:
-                        rehosps_list.append([k, result_dict[k][i]['rsa_index'], delay])
+                        rehosps_list.append([k, result_dict[k][i]['line_number'], delay])
                     last_sej_num = current_sej_num
         if line_number % 100000 == 0:
                 print '\rRehosp detection : processed ', line_number, 
@@ -404,40 +404,34 @@ def load_rehosps_list(rehosps_list_file_path):
     with open(rehosps_list_file_path) as rehosps_file:
         return pickle.load(rehosps_file)
         
-def check_one_rehosp(rehosps_list, ano_file_path, ano_format, index_p=None, ano_hash_p=None, verbose=False):
+def check_one_rehosp(rehosps_list, ano_file_path, ano_format, verbose=False):
     
-    if (index_p!=None):
-        this_index = index_p
-        this_ano_hash = ano_hash_p
-    else:
-        chosen = choice(rehosps_list)
-        this_index = chosen[1]
-        this_ano_hash = chosen[0]
+    chosen = choice(rehosps_list)
+    this_ano_hash = chosen[0]
+    this_line_number = chosen[1]
     this_sej_num = 0
-    index_found = False
+    this_index = 0
     rehosp_found = False
     if verbose:
-        print 'looking for sej ', this_index, ' and ano_hash ', this_ano_hash
-    with open(ano_file_path) as ano_file:
-        while True:
-            ano_line = ano_file.readline()
-            if (len(ano_line.strip())>0):
-                index = int(ano_line[ano_format['rsa_index_sp'] - 1:ano_format['rsa_index_ep']].strip())
-                ano_hash = ano_line[ano_format['ano_sp'] - 1:ano_format['ano_ep']]
-                if (index == this_index) and (ano_hash == this_ano_hash):
-                    if verbose:
-                        print '>>>>> Index found : ' + ano_line
-                    index_found = True
-                    this_sej_num = int(ano_line[ano_format['sej_num_sp'] - 1:ano_format['sej_num_ep']])
-                    break
-            if (not ano_line):
-                break
-    if (not index_found):
-        if verbose:
-            print 'index not found !! :('
-        return
+        print 'looking for line ', this_line_number, ' and ano_hash ', this_ano_hash
+        
+    ano_line = linecache.getline(ano_file_path, this_line_number)
+    
+    if (len(ano_line.strip())==0):
+        print 'Line ' + str(this_line_number) + ' not found !! :('
+        return False
+        
+    this_sej_num = int(ano_line[ano_format['sej_num_sp'] - 1:ano_format['sej_num_ep']])
+    this_index = int(ano_line[ano_format['rsa_index_sp'] - 1:ano_format['rsa_index_ep']].strip())
+    ano_hash = ano_line[ano_format['ano_sp'] - 1:ano_format['ano_ep']]
+    
+    if (ano_hash != this_ano_hash):
+        print 'ANO HAHES are not the same ! :('
+        return False
+    
     if verbose:
             print 'Looking for hash ' + this_ano_hash + ' for sej_num ' + str(this_sej_num)
+
     with open(ano_file_path) as ano_file:
         while True:
             ano_line = ano_file.readline()
