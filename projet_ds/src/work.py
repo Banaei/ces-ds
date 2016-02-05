@@ -20,6 +20,7 @@ ano_clean_file_path_2013 = '/DS/data/pmsi/ano13.clean.txt'
 rsa_clean_file_path_2013 = '/DS/data/pmsi/rsa13.clean.txt'
 selected_ano_hashes_file_path = '/DS/data/pmsi/selected_ano_hash.txt'
 rehosps_list_file_path = '/DS/data/pmsi/rehosps_list.txt'
+rehosps_365_list_file_path = '/DS/data/pmsi/rehosps_365_list.txt'
 
 ano_test_fp = '/DS/data/pmsi/ano.test'
 rsa_test_fp = '/DS/data/pmsi/rsa.test'
