@@ -22,7 +22,7 @@ imp.reload(formats)
 #####################################
 
 # Delais en jours entre deux hospitalisations pour que ca puisse etre considere comme une rehospit
-delai_rehosp = 180
+delai_rehosp = 365
 
 
 codes_ghm_file_path = '../data/codes_ghm.txt'

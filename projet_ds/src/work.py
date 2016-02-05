@@ -50,7 +50,8 @@ pmsi_tools.save_sparse(X_2_fil_path, validation_s_X.tocsr())
 pmsi_tools.save_sparse(y_2_fil_path, vaidation_s_y.tocsr())
 
 pmsi_tools.generate_clean_files(ano_file_path_2013, rsa_file_path_2013, ano_clean_file_path_2013, rsa_clean_file_path_2013, formats.ano_2013_format, formats.rsa_2013_format )
-rehosps_list = pmsi_tools.detect_rehosps(ano_clean_file_path_2013, formats.ano_2013_format, rehosps_list_file_path)
+
+rehosps_list = pmsi_tools.detect_rehosps(ano_clean_file_path_2013, formats.ano_2013_format, rehosps_365_list_file_path)
 pmsi_tools.check_rehosps(rehosps_list_file_path, ano_clean_file_path_2013, formats.ano_2013_format, 1)
 
 pmsi_tools.check_one_rehosp(rehosps_list, ano_clean_file_path_2013, formats.ano_2013_format, verbose=True)
@@ -63,7 +64,21 @@ for l in rehosps_list:
     i+=1
     
 import matplotlib.pyplot as plt
-xbins=range(0,181)
+xbins=range(0,366)
 plt.hist(delays, bins=xbins, color='blue')
+plt.title('Histogramme des delais de rehospitalisation en 2013')
+plt.xlabel('Delai entre deux hospitalisation en jours')
+plt.ylabel('Nombre de sejours')
 plt.show()
+
+np.sum(delays==7)
+
+freq = np.zeros(365, dtype=int)
+for i in range(1, 366):
+    freq[i-1] = np.sum(delays==i)
    
+plt.plot(freq)
+plt.title('Delais de rehospitalisation en 2013')
+plt.xlabel('Delai entre deux hospitalisation en jours')
+plt.ylabel('Nombre de sejours')
+plt.show()
