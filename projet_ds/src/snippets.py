@@ -21,3 +21,13 @@ plt.show()
     
 import linecache
 linecache.getline(ano_clean_file_path_2013, 3)
+
+
+ 
+import matplotlib.pyplot as plt
+xbins=range(0,366)
+plt.hist(delays, bins=xbins, color='blue')
+plt.title('Histogramme des delais de rehospitalisation en 2013')
+plt.xlabel('Delai entre deux hospitalisation en jours')
+plt.ylabel('Nombre de sejours')
+plt.show()

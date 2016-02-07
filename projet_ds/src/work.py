@@ -57,28 +57,59 @@ pmsi_tools.check_rehosps(rehosps_list_file_path, ano_clean_file_path_2013, forma
 pmsi_tools.check_one_rehosp(rehosps_list, ano_clean_file_path_2013, formats.ano_2013_format, verbose=True)
 
 
+
+
+
+
+
+
+
+rehosps_list = pmsi_tools.load_rehosps_list(rehosps_365_list_file_path)
 delays = np.zeros((len(rehosps_list),1))
 i=0
 for l in rehosps_list:
     delays[i]=l[2]
     i+=1
-    
-import matplotlib.pyplot as plt
-xbins=range(0,366)
-plt.hist(delays, bins=xbins, color='blue')
-plt.title('Histogramme des delais de rehospitalisation en 2013')
-plt.xlabel('Delai entre deux hospitalisation en jours')
-plt.ylabel('Nombre de sejours')
-plt.show()
-
-np.sum(delays==7)
-
+   
 freq = np.zeros(365, dtype=int)
 for i in range(1, 366):
     freq[i-1] = np.sum(delays==i)
-   
-plt.plot(freq)
+
+import matplotlib.pyplot as plt
+
+X = np.asarray(range(1,366))
+X_max = np.asarray([1] + range(7,365, 7))
+Y_index = np.asarray(range(0,365))
+Y_index_max = np.asarray([0] + range(6,365, 7))
+
+X_no_max = np.asarray([x for x in X if x not in X_max])
+Y_index_no_max = np.asarray([y for y in Y_index if y not in Y_index_max])
+
+plt.plot(X,freq, 'b-', label='Tout')
+plt.plot(X_max, freq[Y_index_max],'ro', label='1, 7, 14, 21, ... jours')
+plt.plot(X_no_max, freq[Y_index_no_max],'r.', label='Jours non multiples de 7')
 plt.title('Delais de rehospitalisation en 2013')
 plt.xlabel('Delai entre deux hospitalisation en jours')
 plt.ylabel('Nombre de sejours')
+plt.legend(loc="best")
 plt.show()
+
+
+
+
+
+freqf = np.zeros(365)
+for i in range(1, 365):
+    freqf[i] = float(freq[i]-freq[i-1])/float(freq[i-1])
+    
+plt.plot(freqf)
+
+m7 = np.zeros(10, dtype=int)
+m7[0]=1
+x=0
+for i in range(1,10):
+    x = x+7
+    m7[i]=x
+
+plt.plot(freq)
+plt.plot(freq[range(7,365, 7)],range(7,365, 7),'bo')
