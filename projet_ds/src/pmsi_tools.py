@@ -14,6 +14,7 @@ import linecache
 from scipy import sparse
 from scipy.sparse import hstack, vstack
 import math
+import matplotlib.pyplot as plt
 
 imp.reload(formats)
 
@@ -22,7 +23,7 @@ imp.reload(formats)
 #####################################
 
 # Delais en jours entre deux hospitalisations pour que ca puisse etre considere comme une rehospit
-delai_rehosp = 365
+delai_rehosp = 180
 
 
 codes_ghm_file_path = '../data/codes_ghm.txt'
@@ -350,25 +351,28 @@ def generate_clean_files(ano_in_file_path, rsa_in_file_path, ano_out_file_path, 
     print '********************************'
     
 
-def detect_rehosps(ano_file_path, ano_format, rehosps_file_path):
+def detect_rehosps(ano_file_path, ano_format, rsa_file_path, rsa_format, rehosps_file_path):
     result_dict = {}
     line_number = 1
     rehosps_list = list()
     with open(ano_file_path) as ano_file:
-        while True:
-            ano_line = ano_file.readline()
-            if (len(ano_line.strip())>0):
-                ano_hash = ano_line[ano_format['ano_sp'] - 1:ano_format['ano_ep']]
-#                rsa_index = int(ano_line[ano_format['rsa_index_sp'] - 1:ano_format['rsa_index_ep']].strip())
-                sej_num = int(ano_line[ano_format['sej_num_sp'] - 1:ano_format['sej_num_ep']])           
-                if (ano_hash not in result_dict):
-                    result_dict[ano_hash]=list()
-                result_dict[ano_hash].append({'sej_num':sej_num, 'line_number':line_number})
-            if not ano_line:
-                break
-            if line_number % 100000 == 0:
-                    print '\rGetting sej_num, processed ', line_number, 
-            line_number += 1
+        with open(rsa_file_path) as rsa_file:
+            while True:
+                ano_line = ano_file.readline()
+                rsa_line = rsa_file.readline()
+                if (len(ano_line.strip())>0):
+                    ano_hash = ano_line[ano_format['ano_sp'] - 1:ano_format['ano_ep']]
+    #                rsa_index = int(ano_line[ano_format['rsa_index_sp'] - 1:ano_format['rsa_index_ep']].strip())
+                    sej_num = int(ano_line[ano_format['sej_num_sp'] - 1:ano_format['sej_num_ep']])
+                    stay_length = int(rsa_line[rsa_format['stay_length_sp'] - 1:rsa_format['stay_length_ep']].strip()) 
+                    if (ano_hash not in result_dict):
+                        result_dict[ano_hash]=list()
+                    result_dict[ano_hash].append({'sej_num':sej_num, 'stay_length':stay_length, 'line_number':line_number})
+                if not ano_line:
+                    break
+                if line_number % 100000 == 0:
+                        print '\rGetting sej_num, processed ', line_number, 
+                line_number += 1
     print 'Results dict length ' + str(len(result_dict))
     print 'Starting rehosps detection ...'
     line_number = 1
@@ -377,20 +381,23 @@ def detect_rehosps(ano_file_path, ano_format, rehosps_file_path):
             result_dict[k].sort(key=lambda x:x['sej_num'], reverse=True)
             first_loop = True
             last_sej_num = 0
+            last_stay_length = 0
             current_sej_num = 0
             for i in range(0,len(result_dict[k])):
                 if (first_loop):
                     last_sej_num = result_dict[k][i]['sej_num']
+                    last_stay_length = result_dict[k][i]['stay_length']
                     first_loop = False
                     continue
                 else:
                     current_sej_num = result_dict[k][i]['sej_num']
-                    if (last_sej_num < current_sej_num):
-                        raise Exception('Error sorting the list') 
-                    delay = last_sej_num - current_sej_num
+                    if (last_sej_num + last_stay_length < current_sej_num):
+                        raise Exception('Error sorting the list : last_sej_num + last_stay_length >= current_sej_num') 
+                    delay = last_sej_num + last_stay_length - current_sej_num
                     if delay <= delai_rehosp:
                         rehosps_list.append([k, result_dict[k][i]['line_number'], delay])
                     last_sej_num = current_sej_num
+                    last_stay_length = result_dict[k][i]['stay_length']
         if line_number % 100000 == 0:
                 print '\rRehosp detection : processed ', line_number, 
         line_number += 1
@@ -642,7 +649,34 @@ def get_sparse_X_y_from_data(result_dict):
     return sparse_X, sparse_y
     
 
-
+def plot_rehosps_180j(rehosps_list):
+    delays = np.zeros((len(rehosps_list),1))
+    i=0
+    for l in rehosps_list:
+        delays[i]=l[2]
+        i+=1
+       
+    freq = np.zeros(365, dtype=int)
+    for i in range(1, 366):
+        freq[i-1] = np.sum(delays==i)
+    
+    
+    X = np.asarray(range(1,181))
+    X_max = np.asarray(range(7,180, 7))
+    Y_index = np.asarray(range(0,180))
+    Y_index_max = np.asarray(range(6,180, 7))
+    
+    X_no_max = np.asarray([x for x in X if x not in X_max])
+    Y_index_no_max = np.asarray([y for y in Y_index if y not in Y_index_max])
+    
+    plt.plot(X,freq[X-1], 'b-', label='Tout')
+    plt.plot(X_max, freq[Y_index_max],'ro', label='delai = 7, 14, 21, ... jours')
+    plt.plot(X_no_max, freq[Y_index_no_max],'r.', label='delai non multiple de 7')
+    plt.title('Delais de rehospitalisation en 2013')
+    plt.xlabel('Delai entre deux hospitalisation en jours')
+    plt.ylabel('Nombre de sejours')
+    plt.legend(loc="best")
+    plt.show()    
 
 #
 #import numpy as np

@@ -9,6 +9,9 @@ import numpy as np
 import pickle
 import formats
 import imp
+from scipy import sparse
+from sklearn.tree import DecisionTreeClassifier
+from sklearn import tree
 
 imp.reload(formats)
 
@@ -19,10 +22,7 @@ imp.reload(formats)
 ano_clean_file_path_2013 = '/DS/data/pmsi/ano13.clean.txt'
 rsa_clean_file_path_2013 = '/DS/data/pmsi/rsa13.clean.txt'
 rehosps_365_list_file_path = '/DS/data/pmsi/rehosps_365_list.txt'
-
-
-# Delais en jours entre deux hospitalisations pour que ca puisse etre considere comme une rehospit
-delai_rehosp = 365
+rehosps_180_list_file_path = '/DS/data/pmsi/rehosps_180_list.txt'
 
 
 codes_ghm_file_path = '../data/codes_ghm.txt'
@@ -33,7 +33,12 @@ codes_cmd_file_path = '../data/codes_cmd.txt'
 codes_departement_file_path = '../data/codes_departement.txt'
 codes_type_ghm_file_path = '../data/codes_type_ghm.txt'
 codes_complexity_ghm_file_path = '../data/codes_complexity_ghm.txt'
+codes_um_urgences_file_path = '../data/codes_type_um_urg.txt'
+ipe_prives_file_path = '../data/codes_es_prives.txt'
 
+
+X_sparse_file_path = '/DS/data/pmsi/X_sparse_rehosps.npz'
+y_sparse_file_path = '/DS/data/pmsi/y_sparse_rehosps.npz'
 
 
 codes_ghm_list = list()
@@ -44,6 +49,8 @@ codes_complexity_ghm_list = list()
 codes_cmd_list = list()
 codes_departement_list = list()
 codes_type_ghm_list = list()
+codes_um_urgences_dict = {}
+ipe_prives_dict = {}
 column_label_list = list()
 
 
@@ -66,9 +73,16 @@ def fill_codes(codes_file_path, codes_list):
             codes_list.append(code.strip('\n').strip())
     codes_list.sort()
     
+def fill_dict(codes_file_path, codes_dict):
+    with open(codes_file_path) as codes_file:
+        for code in codes_file:
+            codes_dict[code.strip('\n').strip()] = 1
+    
 def create_column_labels():
     column_label_list.append('sex')
     column_label_list.append('age')
+    column_label_list.append('emergency')
+    column_label_list.append('private')
     column_label_list.append('stay_length')
     for dpt in codes_departement_list:
         column_label_list.append('dpt_' + dpt)
@@ -93,11 +107,18 @@ def init():
     del codes_type_ghm_list[:]
     del column_label_list[:]
     
+    codes_um_urgences_dict.clear()
+    ipe_prives_dict.clear()
+
     fill_codes(codes_type_um_file_path, codes_type_um_list)
     fill_codes(codes_cmd_file_path, codes_cmd_list)
     fill_codes(codes_departement_file_path, codes_departement_list)
     fill_codes(codes_type_ghm_file_path, codes_type_ghm_list)
     fill_codes(codes_complexity_ghm_file_path, codes_complexity_ghm_list)
+    
+    fill_dict(codes_um_urgences_file_path, codes_um_urgences_dict)
+    fill_dict(ipe_prives_file_path, ipe_prives_dict)
+
     create_column_labels()
     
     
@@ -107,9 +128,12 @@ def load_rehosps_list(rehosps_list_file_path):
 
 
 def get_rsa_data(rsa, rsa_format, verbose=None):
+    emergency = 0
+    private = 0
     rsa = rsa.replace('\n', '')   
-    index = int(rsa[rsa_format['index_sp'] - 1:rsa_format['index_ep']].strip())    
-    sex = int(rsa[rsa_format['sex_sp'] - 1:rsa_format['sex_ep']].strip())    
+    sex = int(rsa[rsa_format['sex_sp'] - 1:rsa_format['sex_ep']].strip())
+    finess = rsa[rsa_format['finess_sp']:rsa_format['finess_ep']].strip()
+    private = 1*(finess in ipe_prives_dict)
     departement = rsa[rsa_format['finess_sp']:rsa_format['finess_sp']+2].strip()
     cmd = rsa[rsa_format['cmd_sp'] - 1:rsa_format['cmd_ep']].strip()
     try:
@@ -131,13 +155,16 @@ def get_rsa_data(rsa, rsa_format, verbose=None):
     type_um_length = int(rsa_format['type_um_length'])    
     first_um_sp = fixed_zone_length + (nb_aut_pgv * aut_pgv_length) + (nb_suppl_radio * suppl_radio_length) + type_um_offset
     type_um_dict = {}
+    first_loop = True
     for i in range(0, nb_rum):
         type_um = rsa[first_um_sp: first_um_sp + type_um_length].strip()
         type_um_dict[type_um] = 1
         first_um_sp += rum_length
+        if first_loop:
+            first_loop = False
+            emergency = 1*(type_um in codes_um_urgences_dict)
         
     return {
-    'index':index,
     'cmd':cmd,
     'sex':sex,
     'dpt':departement,
@@ -146,11 +173,12 @@ def get_rsa_data(rsa, rsa_format, verbose=None):
     'type_ghm':type_ghm,
     'complexity_ghm':complexity_ghm,
     'type_um':type_um_dict.keys(),
-    'rehosp':0,
+    'emergency':emergency,
+    'private':private
      }
 
 
-def load_rhosps_as_dict(file_path=rehosps_365_list_file_path):
+def load_rhosps_as_dict(file_path=rehosps_180_list_file_path):
     '''
     Cette methode verfifie pour chaque line_number (deuxieme element de la liste des rehosps) si le delai 
     de rehospitalisation est un point max ou pas (delais 1, 7, 14, 21, ...).
@@ -171,6 +199,8 @@ def load_rhosps_as_dict(file_path=rehosps_365_list_file_path):
 def rsa_to_X(rsa_data_dict, X, i, cll=column_label_list):
     X[i, cll.index('sex')]=rsa_data_dict['sex']
     X[i, cll.index('age')]=rsa_data_dict['age']
+    X[i, cll.index('emergency')]=rsa_data_dict['emergency']
+    X[i, cll.index('private')]=rsa_data_dict['private']
     X[i, cll.index('stay_length')]=rsa_data_dict['stay_length']
     X[i, cll.index('dpt_' + rsa_data_dict['dpt'])]=1
     X[i, cll.index('type_ghm_' + rsa_data_dict['type_ghm'])]=1
@@ -180,19 +210,65 @@ def rsa_to_X(rsa_data_dict, X, i, cll=column_label_list):
 
 
 def get_rsas_rehosps_7x(rehosps_dict, rsas_file_path=rsa_clean_file_path_2013, rsa_format=formats.rsa_2013_format, cll=column_label_list):
+    '''
+    This method parses the lines of the file rsas_file_path and takes only those whose line_number (starting from 1) are included in rehosps_dict, i. e.
+    the RSAs with rehosp.
+    It returns two arrays:
+    X : the features according to colum_label_list
+    Y : responsewith 1 = rehosp delay 1 or multiple of 7 (days), 0 otherwise
+    '''
     line_number = 1
-    X = np.zeros((len(rehosps_dict), len(cll)))
+    i = 0
+    rows_count = len(rehosps_dict)
+    cols_count = len(cll)
+    sparse_X = sparse.lil_matrix((rows_count, cols_count))
+    sparse_y = sparse.lil_matrix((rows_count, 1))
+
     with open(rsas_file_path) as rsa_file:
         while True:
             rsa_line = rsa_file.readline().strip()
             if (line_number in rehosps_dict):
-                rsa_data = get_rsa_data(rsa_line, rsa_format)
-                
-
+                rsa_data_dict = get_rsa_data(rsa_line, rsa_format)
+                rsa_to_X(rsa_data_dict, sparse_X, i)
+                if rehosps_dict[line_number]:
+                    sparse_y[i] = 1
+                i += 1
             line_number += 1
+            if line_number % 10000 == 0:
+                print '\rLines processed ', line_number, ', % processed ', (i*100/rows_count),
             if (not rsa_line):
                 break
 
+    return sparse_X, sparse_y
+
+
+def save_sparse(filename, array):
+    np.savez(filename, data=array.data, indices=array.indices, indptr=array.indptr, shape=array.shape)
+
+
+def load_sparse(filename):
+    loader = np.load(filename)
+    return sparse.csr_matrix((loader['data'], loader['indices'], loader['indptr']), shape=loader['shape'])
+
+
+def analyse_and_learn(X_data_filename, Y_data_filename, min_depth = 1, max_depth = 10):
+    print 'Loading data ...'
+    X_data = load_sparse(X_data_filename)
+    print 'X_data loaded'
+    Y_data = load_sparse(Y_data_filename)
+    print 'Y_data loaded'
+    scores = list()
+    print 'Total population size = ', X_data.shape[0]
+    print 'Total number of features =', X_data.shape[1]
+    print 'Total number of labels =', Y_data.shape[0]
+    print 'Beginning Desicion Tree classification'
+    Y_dense = Y_data.todense()
+    for depth in range(min_depth, max_depth+1):
+        dtc = DecisionTreeClassifier(criterion='gini', max_depth=depth)
+        dtc.fit(X_data, Y_dense)
+        score = dtc.score(X_data, Y_dense)
+        scores.append((depth, score))
+        print 'depth = ', depth, 'score = ', score
 
 
 
@@ -200,7 +276,13 @@ def get_rsas_rehosps_7x(rehosps_dict, rsas_file_path=rsa_clean_file_path_2013, r
 #                     WORK AREA
 # ########################################################
 
+init()
 rehosps_dict = load_rhosps_as_dict()
+X, y = get_rsas_rehosps_7x(rehosps_dict)
+save_sparse(X_sparse_file_path, X.tocsr())
+save_sparse(y_sparse_file_path, y.tocsr())
+
+analyse_and_learn(X_sparse_file_path, y_sparse_file_path)
 
 
 
