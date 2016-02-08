@@ -168,19 +168,20 @@ def load_rhosps_as_dict(file_path=rehosps_365_list_file_path):
     return result
 
 
-def rsa_to_X(rsa, X, i, cll=column_label_list):
-    X[i, cll.index('sex')]=rsa['sex']
-    X[i, cll.index('age')]=rsa['age']
-    X[i, cll.index('stay_length')]=rsa['stay_length']
-    X[i, cll.index('dpt_' + rsa['dpt'])]=1
-    X[i, cll.index('type_ghm_' + rsa['type_ghm'])]=1
-    X[i, cll.index('complexity_ghm_' + rsa['complexity_ghm'])]=1
-    for t_u in rsa['type_um']:
+def rsa_to_X(rsa_data_dict, X, i, cll=column_label_list):
+    X[i, cll.index('sex')]=rsa_data_dict['sex']
+    X[i, cll.index('age')]=rsa_data_dict['age']
+    X[i, cll.index('stay_length')]=rsa_data_dict['stay_length']
+    X[i, cll.index('dpt_' + rsa_data_dict['dpt'])]=1
+    X[i, cll.index('type_ghm_' + rsa_data_dict['type_ghm'])]=1
+    X[i, cll.index('complexity_ghm_' + rsa_data_dict['complexity_ghm'])]=1
+    for t_u in rsa_data_dict['type_um']:
         X[i, cll.index('type_um_' + t_u)]=1
 
 
-def get_rsas_rehosps_7x(rehosps_dict, rsas_file_path=rsa_clean_file_path_2013, rsa_format=formats.rsa_2013_format):
+def get_rsas_rehosps_7x(rehosps_dict, rsas_file_path=rsa_clean_file_path_2013, rsa_format=formats.rsa_2013_format, cll=column_label_list):
     line_number = 1
+    X = np.zeros((len(rehosps_dict), len(cll)))
     with open(rsas_file_path) as rsa_file:
         while True:
             rsa_line = rsa_file.readline().strip()
