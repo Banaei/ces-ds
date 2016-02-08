@@ -269,6 +269,7 @@ def analyse_and_learn(X_data_filename, Y_data_filename, min_depth = 1, max_depth
         score = dtc.score(X_data, Y_dense)
         scores.append((depth, score))
         print 'depth = ', depth, 'score = ', score
+    return dtc
 
 
 
@@ -282,7 +283,7 @@ X, y = get_rsas_rehosps_7x(rehosps_dict)
 save_sparse(X_sparse_file_path, X.tocsr())
 save_sparse(y_sparse_file_path, y.tocsr())
 
-analyse_and_learn(X_sparse_file_path, y_sparse_file_path)
+analyse_and_learn(X_sparse_file_path, y_sparse_file_path, max_depth = 1)
 
 
 
