@@ -12,6 +12,7 @@ import imp
 from scipy import sparse
 from sklearn.tree import DecisionTreeClassifier
 from sklearn import tree
+import matplotlib.pyplot as plt
 
 imp.reload(formats)
 
@@ -35,6 +36,8 @@ codes_type_ghm_file_path = '../data/codes_type_ghm.txt'
 codes_complexity_ghm_file_path = '../data/codes_complexity_ghm.txt'
 codes_um_urgences_file_path = '../data/codes_type_um_urg.txt'
 ipe_prives_file_path = '../data/codes_es_prives.txt'
+
+rfe_file_path = '../data/rfe'
 
 
 X_sparse_file_path = '/DS/data/pmsi/X_sparse_rehosps.npz'
@@ -122,7 +125,7 @@ def init():
     create_column_labels()
     
     
-def load_rehosps_list(rehosps_list_file_path):            
+def load_rehosps_list(rehosps_list_file_path=rehosps_180_list_file_path):            
     with open(rehosps_list_file_path) as rehosps_file:
         return pickle.load(rehosps_file)
 
@@ -272,7 +275,67 @@ def analyse_and_learn(X_data_filename, Y_data_filename, min_depth = 1, max_depth
     return dtc
 
 
-
+def plot_rehosps_180j(rehosps_list):
+    delays = np.zeros((len(rehosps_list),1))
+    i=0
+    for l in rehosps_list:
+        delays[i]=l[2]
+        i+=1
+       
+    freq = np.zeros(365, dtype=int)
+    for i in range(1, 366):
+        freq[i-1] = np.sum(delays==i)
+    
+    
+    X = np.asarray(range(1,181))
+    X_max = np.asarray(range(7,180, 7))
+    Y_index = np.asarray(range(0,180))
+    Y_index_max = np.asarray(range(6,180, 7))
+    
+    X_no_max = np.asarray([x for x in X if x not in X_max])
+    Y_index_no_max = np.asarray([y for y in Y_index if y not in Y_index_max])
+    
+    plt.plot(X,freq[X-1], 'b-', label='Tout')
+    plt.plot(X_max, freq[Y_index_max],'ro', label='delai = 7, 14, 21, ... jours')
+    plt.plot(X_no_max, freq[Y_index_no_max],'r.', label='delai non multiple de 7')
+    plt.title('Delais de rehospitalisation en 2013')
+    plt.xlabel('Delai entre deux hospitalisation en jours')
+    plt.ylabel('Nombre de sejours')
+    plt.legend(loc="best")
+    plt.show()    
+    
+    
+def plot_rehosps_180j_cumsum(rehosps_list):
+    delays = np.zeros((len(rehosps_list),1))
+    i=0
+    for l in rehosps_list:
+        delays[i]=l[2]
+        i+=1
+       
+    freq = np.zeros(365, dtype=int)
+    for i in range(1, 366):
+        freq[i-1] = np.sum(delays==i)
+    
+    freq_cumsum = np.cumsum(freq)
+    
+    X = np.asarray(range(1,181))
+    X_max = np.asarray(range(7,180, 7))
+    Y_index = np.asarray(range(0,180))
+    Y_index_max = np.asarray(range(6,180, 7))
+    
+    X_no_max = np.asarray([x for x in X if x not in X_max])
+    Y_index_no_max = np.asarray([y for y in Y_index if y not in Y_index_max])
+    
+    plt.plot(X,freq_cumsum[X-1], 'b-', label='Tout')
+    plt.plot(X_max, freq_cumsum[Y_index_max],'ro', label='delai = 7, 14, 21, ... jours')
+    plt.plot(X_no_max, freq_cumsum[Y_index_no_max],'r.', label='delai non multiple de 7')
+    plt.title('Delais de rehospitalisation en 2013')
+    plt.xlabel('Delai entre deux hospitalisation en jours')
+    plt.ylabel('Nombre de sejours')
+    plt.legend(loc="best")
+    plt.show()    
+    
+    
 # ########################################################
 #                     WORK AREA
 # ########################################################
@@ -283,9 +346,13 @@ X, y = get_rsas_rehosps_7x(rehosps_dict)
 save_sparse(X_sparse_file_path, X.tocsr())
 save_sparse(y_sparse_file_path, y.tocsr())
 
+rehosps_list = load_rehosps_list()
+plot_rehosps_180j_cumsum(rehosps_list)
 
 X_sp = load_sparse(X_sparse_file_path)
 y_sp = load_sparse(y_sparse_file_path)
+
+float(np.sum(y_sp.todense()))/float(len(y_sp.todense()))
 
 dtc = analyse_and_learn(X_sparse_file_path, y_sparse_file_path, max_depth = 1)
 
@@ -296,5 +363,30 @@ from sklearn.linear_model import LogisticRegression
 model = LogisticRegression()
 rfe = RFE(model, 3, verbose=1)
 rfe = rfe.fit(X_sp, y_sp.todense())
+
+with open(rfe_file_path, 'w') as f:
+    pickle.dump(rfe, f)
+    
+with open(rfe_file_path) as f:
+    rfe_2 = pickle.load(f)
+
+features = rfe.support_
+ranks = rfe.ranking_
+
+np.where(features==True)[0][1]
+
+column_label_list[np.where(features==True)[0][0]]
+column_label_list[np.where(features==True)[0][1]]
+column_label_list[np.where(features==True)[0][2]]
+
+labels_ranked = list()
+i = 0
+for rank in ranks:
+    labels_ranked.append({'rank':rank, 'label':column_label_list[i]})
+    i += 1
+labels_ranked.sort(key=lambda x:x['rank'])
+
+
 print(rfe.support_)
 print(rfe.ranking_)
+
