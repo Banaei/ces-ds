@@ -678,6 +678,7 @@ def plot_rehosps_180j(rehosps_list):
     plt.legend(loc="best")
     plt.show()    
 
+
 #
 #import numpy as np
 #import pandas as pd

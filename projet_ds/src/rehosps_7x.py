@@ -39,7 +39,7 @@ ipe_prives_file_path = '../data/codes_es_prives.txt'
 
 X_sparse_file_path = '/DS/data/pmsi/X_sparse_rehosps.npz'
 y_sparse_file_path = '/DS/data/pmsi/y_sparse_rehosps.npz'
-
+tree_dot_file_name = '../data/tree.dot'
 
 codes_ghm_list = list()
 codes_ccam_list = list()
@@ -251,12 +251,12 @@ def load_sparse(filename):
     return sparse.csr_matrix((loader['data'], loader['indices'], loader['indptr']), shape=loader['shape'])
 
 
-def analyse_and_learn(X_data_filename, Y_data_filename, min_depth = 1, max_depth = 10):
-    print 'Loading data ...'
-    X_data = load_sparse(X_data_filename)
-    print 'X_data loaded'
-    Y_data = load_sparse(Y_data_filename)
-    print 'Y_data loaded'
+def analyse_and_learn(X_data, Y_data, min_depth = 1, max_depth = 10):
+#    print 'Loading data ...'
+#    X_data = load_sparse(X_data_filename)
+#    print 'X_data loaded'
+#    Y_data = load_sparse(Y_data_filename)
+#    print 'Y_data loaded'
     scores = list()
     print 'Total population size = ', X_data.shape[0]
     print 'Total number of features =', X_data.shape[1]
@@ -282,8 +282,19 @@ rehosps_dict = load_rhosps_as_dict()
 X, y = get_rsas_rehosps_7x(rehosps_dict)
 save_sparse(X_sparse_file_path, X.tocsr())
 save_sparse(y_sparse_file_path, y.tocsr())
+X = load_sparse(X_sparse_file_path)
+y = load_sparse(y_sparse_file_path)
 
-analyse_and_learn(X_sparse_file_path, y_sparse_file_path, max_depth = 1)
+np.max(X[:,4].todense())
+np.median(X[:,4].todense(), axis=0)
 
+import matplotlib.pyplot as plt
+xbins=range(0,180)
+plt.hist(X[:,4].todense(), bins=xbins, color='blue')
+plt.title('Histogramme des delais de rehospitalisation en 2013')
+plt.xlabel('Delai entre deux hospitalisation en jours')
+plt.ylabel('Nombre de sejours')
+plt.show()
 
-
+dtc = analyse_and_learn(X, y, max_depth = 3)
+tree.export_graphviz(dtc, out_file=tree_dot_file_name, feature_names=column_label_list)
