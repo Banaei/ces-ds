@@ -283,7 +283,18 @@ X, y = get_rsas_rehosps_7x(rehosps_dict)
 save_sparse(X_sparse_file_path, X.tocsr())
 save_sparse(y_sparse_file_path, y.tocsr())
 
-analyse_and_learn(X_sparse_file_path, y_sparse_file_path, max_depth = 1)
+
+X_sp = load_sparse(X_sparse_file_path)
+y_sp = load_sparse(y_sparse_file_path)
+
+dtc = analyse_and_learn(X_sparse_file_path, y_sparse_file_path, max_depth = 1)
 
 
+from sklearn.feature_selection import RFE
+from sklearn.linear_model import LogisticRegression
 
+model = LogisticRegression()
+rfe = RFE(model, 3, verbose=1)
+rfe = rfe.fit(X_sp, y_sp.todense())
+print(rfe.support_)
+print(rfe.ranking_)
