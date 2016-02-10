@@ -433,3 +433,19 @@ print(rfe.ranking_)
 
 dtc = analyse_and_learn(X, y, max_depth = 3)
 tree.export_graphviz(dtc, out_file=tree_dot_file_name, feature_names=column_label_list)
+
+
+
+y_dense = np.asarray( y_sp.todense())
+J = np.asarray(X_sp[(y_dense==1)(0), :].todense())
+X_sp[y_dense==1,:]
+np.sum(y_dense)
+np.sum(J)
+np.sum(J * y_dense)
+
+k=0
+for i in range(0,J.shape[0]):
+    if J[i]==1 and y_dense[i]==1:
+        k += 1
+    if i % 10000 == 1:
+        print "\rProcessed ", i,
