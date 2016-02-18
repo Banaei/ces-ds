@@ -4,6 +4,7 @@
 Created on Sun Jan 10
 @author: Alireza BANAEI
 """
+
 from random import random, choice
 import formats
 import imp
@@ -25,15 +26,21 @@ imp.reload(formats)
 # Delais en jours entre deux hospitalisations pour que ca puisse etre considere comme une rehospit
 delai_rehosp = 180
 
+data_directory = '/DS/data/pmsi/'
+refs_directory = '../refs/'
+results_directory = '../results/'
 
-codes_ghm_file_path = '../data/codes_ghm.txt'
-codes_cim_file_path = '../data/codes_cim10.txt'
-codes_ccam_file_path = '../data/codes_ccam.txt'
-codes_type_um_file_path = '../data/codes_type_um.txt'
-codes_cmd_file_path = '../data/codes_cmd.txt'
-codes_departement_file_path = '../data/codes_departement.txt'
-codes_type_ghm_file_path = '../data/codes_type_ghm.txt'
-codes_complexity_ghm_file_path = '../data/codes_complexity_ghm.txt'
+codes_ghm_file_path = refs_directory + 'codes_ghm.txt'
+codes_cim_file_path = refs_directory + 'codes_cim10.txt'
+codes_ccam_file_path = refs_directory + 'codes_ccam.txt'
+codes_type_um_file_path = refs_directory + 'codes_type_um.txt'
+codes_cmd_file_path = refs_directory + 'codes_cmd.txt'
+codes_departement_file_path = refs_directory + 'codes_departement.txt'
+codes_type_ghm_file_path = refs_directory + 'codes_type_ghm.txt'
+codes_complexity_ghm_file_path = refs_directory + 'codes_complexity_ghm.txt'
+column_label_list_file_path = refs_directory + 'cll'
+column_label_dict_file_path = refs_directory + 'cld'
+
 
 
 
@@ -46,6 +53,7 @@ codes_cmd_list = list()
 codes_departement_list = list()
 codes_type_ghm_list = list()
 column_label_list = list()
+column_label_dict = {}
 
 
 
@@ -101,6 +109,7 @@ def init():
     del codes_departement_list[:]
     del codes_type_ghm_list[:]
     del column_label_list[:]
+    column_label_dict.clear()
     
     fill_codes(codes_ghm_file_path, codes_ghm_list)
     fill_codes(codes_cim_file_path, codes_cim_list)
@@ -111,6 +120,22 @@ def init():
     fill_codes(codes_type_ghm_file_path, codes_type_ghm_list)
     fill_codes(codes_complexity_ghm_file_path, codes_complexity_ghm_list)
     create_column_labels()
+    for label in column_label_list:
+        column_label_dict[label] = column_label_list.index(label)
+
+    with open(column_label_list_file_path, 'w') as f:
+        pickle.dump(column_label_list, f)
+        
+    with open(column_label_dict_file_path, 'w') as f:
+        pickle.dump(column_label_dict, f)
+
+
+def load():
+    with open(column_label_list_file_path) as f:
+        column_label_list = pickle.load(f)
+    with open(column_label_dict_file_path) as f:
+        column_label_dict = pickle.load(f)
+    return column_label_list, column_label_dict
 
     
 def save_sparse(filename, array):
@@ -184,11 +209,11 @@ def get_rsa_data(rsa, rsa_format, verbose=None):
     
     rsa = rsa.replace('\n', '')
     
-    index = int(rsa[rsa_format['index_sp'] - 1:rsa_format['index_ep']].strip())
+    index = int(rsa[rsa_format['index_sp']-1:rsa_format['index_ep']].strip())
     
-    sex = int(rsa[rsa_format['sex_sp'] - 1:rsa_format['sex_ep']].strip())
+    sex = int(rsa[rsa_format['sex_sp']-1:rsa_format['sex_ep']].strip())
     
-    departement = rsa[rsa_format['finess_sp']:rsa_format['finess_sp']+2].strip()
+    departement = rsa[rsa_format['finess_sp' ]-1:rsa_format['finess_sp']+1].strip()
     if (not check_code(departement, departement=True)):
         if verbose:
             print 'Error in departement %s, RSA ignored' % (departement)
@@ -333,7 +358,7 @@ def generate_clean_files(ano_in_file_path, rsa_in_file_path, ano_out_file_path, 
                                 print '*****************************************************'
                                 print '*****************************************************'
                                 raise Exception('GRAVE : ANO and RSA inndexes are not the same')
-                            error, rsa_data_dict = get_rsa_data(rsa_line, rsa_format)
+                            error, rsa_data_dict = get_rsa_data(rsa_line, rsa_format, verbose=True)
                             if not error:
                                 ano_out_file.write(ano_line)
                                 rsa_out_file.write(rsa_line)
@@ -633,6 +658,23 @@ def rsa_to_X_y(rsa, X, y, i, cll):
         X[i, cll.index('acte_' + acte)]=1
     y[i] = rsa['rehosp']
 
+def add_rsa_data(rsa, X, cld=column_label_dict):
+    X[cld['sex']]+=rsa[1]['sex']
+    X[cld['age']]+=rsa[1]['age']
+    X[cld['stay_length']]+=rsa[1]['stay_length']
+    X[cld['dpt_' + rsa[1]['dpt']]]+=1
+    X[cld['type_ghm_' + rsa[1]['type_ghm']]]+=1
+    X[cld['complexity_ghm_' + rsa[1]['complexity_ghm']]]+=1
+    for t_u in rsa[1]['type_um']:
+        X[cld['type_um_' + t_u]]+=1
+    X[cld['dp_' + rsa[1]['dp']]]+=1
+    if (len(rsa[1]['dr'])>0):
+        X[cld['dr_' + rsa[1]['dr']]]+=1
+    for das in rsa[1]['das']:
+        X[cld['das_' + das]]+=1
+    for acte in rsa[1]['actes']:
+        X[cld['acte_' + acte]]+=1
+
 
 def get_sparse_X_y_from_data(result_dict):
     rsa_list = get_as_rsa_list(result_dict)
@@ -679,6 +721,7 @@ def plot_rehosps_180j(rehosps_list):
     plt.show()    
 
 
+column_label_list, column_label_dict = load()
 #
 #import numpy as np
 #import pandas as pd

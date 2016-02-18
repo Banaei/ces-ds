@@ -16,6 +16,7 @@ import matplotlib.pyplot as plt
 from sklearn.feature_selection import RFE
 from sklearn.linear_model import LogisticRegression
 import os
+import pandas as pd
 
 imp.reload(formats)
 
@@ -41,6 +42,8 @@ codes_type_ghm_file_path = refs_directory + 'codes_type_ghm.txt'
 codes_complexity_ghm_file_path = refs_directory + 'codes_complexity_ghm.txt'
 codes_um_urgences_file_path = refs_directory + 'codes_type_um_urg.txt'
 ipe_prives_file_path = refs_directory + 'codes_es_prives.txt'
+column_label_list_file_path = refs_directory + 'short_cll'
+column_label_dict_file_path = refs_directory + 'short_cld'
 
 rfe_file_path = results_directory + 'rfe'
 dtc_file_path = results_directory + 'dtc'
@@ -62,6 +65,7 @@ codes_type_ghm_list = list()
 codes_um_urgences_dict = {}
 ipe_prives_dict = {}
 column_label_list = list()
+column_label_dict = {}
 
 
 
@@ -104,6 +108,7 @@ def create_column_labels():
         column_label_list.append('complexity_ghm_' + complexity_ghm)
     for type_um in codes_type_um_list:
         column_label_list.append('type_um_' + type_um)
+    
         
 def init():
     
@@ -124,12 +129,28 @@ def init():
     fill_codes(codes_cmd_file_path, codes_cmd_list)
     fill_codes(codes_departement_file_path, codes_departement_list)
     fill_codes(codes_type_ghm_file_path, codes_type_ghm_list)
-    fill_codes(codes_complexity_ghm_file_path, codes_complexity_ghm_list)
-    
+    fill_codes(codes_complexity_ghm_file_path, codes_complexity_ghm_list)    
     fill_dict(codes_um_urgences_file_path, codes_um_urgences_dict)
     fill_dict(ipe_prives_file_path, ipe_prives_dict)
 
     create_column_labels()
+
+    for label in column_label_list:
+        column_label_dict[label] = column_label_list.index(label)
+
+    with open(column_label_list_file_path, 'w') as f:
+        pickle.dump(column_label_list, f)
+        
+    with open(column_label_dict_file_path, 'w') as f:
+        pickle.dump(column_label_dict, f)
+        
+
+def load():
+    with open(column_label_list_file_path) as f:
+        column_label_list = pickle.load(f)
+    with open(column_label_dict_file_path) as f:
+        column_label_dict = pickle.load(f)
+    return column_label_list, column_label_dict
     
 
 # ############################################################################
@@ -141,10 +162,10 @@ def get_rsa_data(rsa, rsa_format, verbose=None):
     emergency = 0
     private = 0
     rsa = rsa.replace('\n', '')   
-    sex = int(rsa[rsa_format['sex_sp'] - 1:rsa_format['sex_ep']].strip())
-    finess = rsa[rsa_format['finess_sp']:rsa_format['finess_ep']].strip()
+    sex = int(rsa[rsa_format['sex_sp']-1:rsa_format['sex_ep']].strip())
+    finess = rsa[rsa_format['finess_sp']-1:rsa_format['finess_ep']].strip()
     private = 1*(finess in ipe_prives_dict)
-    departement = rsa[rsa_format['finess_sp']:rsa_format['finess_sp']+2].strip()
+    departement = rsa[rsa_format['finess_sp']-1:rsa_format['finess_sp']+1].strip()
     cmd = rsa[rsa_format['cmd_sp'] - 1:rsa_format['cmd_ep']].strip()
     try:
         age = int(rsa[rsa_format['age_in_year_sp'] - 1:rsa_format['age_in_year_ep']].strip())
@@ -257,7 +278,7 @@ def load_rhosps_as_dict(file_path=rehosps_180_list_file_path):
     '''
     rehsops_list = load_rehosps_list(file_path)
     result = {}
-    delays_7x = np.asarray([1] + range(7,365, 7)) # delays multiple of 7 : 1, 7, 14, 21, ...
+    delays_7x = range(7,183, 7) # delays multiple of 7 : 1, 7, 14, 21, ...
     for rehosp in rehsops_list:
         line_number = rehosp[1]
         delay = rehosp[2]
@@ -336,9 +357,9 @@ def plot_rehosps_180j_cumsum(rehosps_list):
 # ############################################################################
 
     
-def feature_select_rfe_logistic_regression(X, y, n, verbose=1):
+def feature_select_rfe_logistic_regression(X, y, n, v=1):
     model = LogisticRegression()
-    rfe = RFE(model, n, verbose)
+    rfe = RFE(model, n, verbose=v)
     rfe = rfe.fit(X_sp, y_sp.todense())
     return rfe
 
@@ -374,10 +395,11 @@ def learn_tree(X_data, Y_data, min_depth = 1, max_depth = 10):
 # ########################################################
 
 # initializing the parameters
-init()
+column_label_list, column_label_dict = load()
 
 # plotting rehosps
 rehosps_list = load_rehosps_list()
+plot_rehosps_180j(rehosps_list)
 plot_rehosps_180j_cumsum(rehosps_list)
 
 # generating features (X) and target(y) sparse matrices and saving them
@@ -386,9 +408,48 @@ X, y = get_rsas_rehosps_7x(rehosps_dict)
 save_sparse(X_sparse_file_path, X.tocsr())
 save_sparse(y_sparse_file_path, y.tocsr())
 
+features_sum = np.sum(X.todense(), axis=0)
+
+
 # loading sparse matrices
 X_sp = load_sparse(X_sparse_file_path)
 y_sp = load_sparse(y_sparse_file_path)
+X_dense = np.asarray( X_sp.todense())
+y_dense = np.asarray( y_sp.todense())
+
+index_y7x_1 = np.asarray(range(0,len(y_dense))).reshape((len(y_dense), 1))[y_dense==1]
+index_y7x_0 = np.asarray(range(0,len(y_dense))).reshape((len(y_dense), 1))[y_dense==0]
+
+features_mean_y7x_1 = np.mean(X_dense[index_y7x_1,:], axis=0)
+features_mean_y7x_0 = np.mean(X_dense[index_y7x_0,:], axis=0)
+
+features_mean_y7x = np.vstack((features_mean_y7x_0, features_mean_y7x_1)).T
+
+features_mean_y7x_1_df = pd.DataFrame(features_mean_y7x_1, index=np.asarray(column_label_list))
+features_mean_y7x_0_df = pd.DataFrame(features_mean_y7x_0, index=np.asarray(column_label_list))
+features_mean_y7x_df = pd.DataFrame(features_mean_y7x, index=np.asarray(column_label_list), columns=['no_7x', '7x'])
+
+features_mean_y7x_df.describe()
+
+features_mean_y7x_1 / features_mean_y7x_0
+
+features_sum = np.sum(X_sp.todense(), axis=0)
+
+fatures_sum_df = pd.DataFrame(features_sum, columns=np.asarray(column_label_list))
+
+fatures_sum_df.loc[0]
+
+# Explorative analysis
+X_sum_df = pd.DataFrame(np.sum(X_sp.todense(), axis=0), columns=np.asarray(column_label_list))
+for i in range(X_sum_df.shape[1]):
+    print column_label_list[i],  X_sum_df.loc[0][i]
+
+
+
+X_sp = X
+y_sp = y
+
+
 
 # Creating a decision tree, and saving it
 dtc = learn_tree(X_sp, y_sp, max_depth = 3)
@@ -402,7 +463,13 @@ f = tree.export_graphviz(dtc, out_file=tree_dot_file_path, feature_names=column_
 os.system("dot -Tpdf " + tree_dot_file_path + " -o " + tree_pdf_file_path)
 
 # Recursive feature selection and saving it
-rfe = feature_select_rfe_logistic_regression(X_sp, y_sp)
+rfe = feature_select_rfe_logistic_regression(X_sp, y_sp, 1)
+
+model = LogisticRegression()
+rfe = RFE(model, 1, verbose=1)
+rfe.fit(X_sp, y_sp.todense())
+
+
 with open(rfe_file_path, 'w') as f:
     pickle.dump(rfe, f)
 
@@ -410,34 +477,66 @@ with open(rfe_file_path, 'w') as f:
 with open(rfe_file_path) as f:
     rfe = pickle.load(f)
 
-
+# Information from RFE
+score = rfe.score(X_sp, y_dense)
+rfe.get_support(indices=True)
 features = rfe.support_
 ranks = rfe.ranking_
 
-np.where(features==True)[0][1]
-
-column_label_list[np.where(features==True)[0][0]]
-column_label_list[np.where(features==True)[0][1]]
-column_label_list[np.where(features==True)[0][2]]
-
-labels_ranked = list()
+# Getting feature labels by rak
+labels_ranked = {}
 i = 0
 for rank in ranks:
-    labels_ranked.append({'rank':rank, 'label':column_label_list[i]})
+    labels_ranked[rank] = {'indice':i, 'label':column_label_list[i]}
     i += 1
-labels_ranked.sort(key=lambda x:x['rank'])
 
 
-print(rfe.support_)
-print(rfe.ranking_)
+# Doing single logistic regression
+feature_index = 1
+lr = LogisticRegression()
+X = np.hstack([X_sp[:,labels_ranked[feature_index]['indice']].todense(), np.zeros((X_sp.shape[0],1))])
+lr.fit(X, y_dense)
+y_predicted = lr.predict(X)
+lr.score(X, y_dense)
 
-dtc = analyse_and_learn(X, y, max_depth = 3)
-tree.export_graphviz(dtc, out_file=tree_dot_file_name, feature_names=column_label_list)
+# LR with all one X matrix
+X = np.ones((X_sp.shape[0],1))
+lr.fit(X, y_dense)
+score = lr.score(X, y_dense)
+bayesian = 1-np.sum(y_dense)/len(y_dense)
+print score
+print bayesian
+# The LR score is the same as the bayesian rate and = LR score with any feature !!
 
 
+# LR with the n first features chosen by RFE
+n = 10
+lr = LogisticRegression(verbose=1)
+indices_list = list()
+for i in range(1,n+1):
+    indices_list.append(labels_ranked[i]['indice'])
+indices_array = np.asarray(indices_list)
+X = X_sp[:,indices_array]
+lr.fit(X, y_dense)
+score_n = lr.score(X, y_dense)
+print 'LR score for the following features :'
+for i in range(1, n+1):
+    print labels_ranked[i]
+print ' = ' + str(score_n)
 
-y_dense = np.asarray( y_sp.todense())
-J = np.asarray(X_sp[(y_dense==1)(0), :].todense())
+print 'coeffs : ', lr.coef_
+print 'intercept', lr.intercept_
+
+# Sum of features for 7x rehosps
+x7_sejs = X_sp.todense()[y_dense==1, :]
+nox7_sejs = X_sp.todense()[y_dense==0, :]
+x7_sejs_sum_df = pd.DataFrame(np.sum(x7_sejs, axis=0), columns=np.asarray(column_label_list))
+x7_sejs_mean_df = pd.DataFrame(np.mean(x7_sejs, axis=0), columns=np.asarray(column_label_list))
+nox7_sejs_sum_df = pd.DataFrame(np.sum(nox7_sejs, axis=0), columns=np.asarray(column_label_list))
+nox7_sejs_mean_df = pd.DataFrame(np.mean(nox7_sejs, axis=0), columns=np.asarray(column_label_list))
+
+np.divide(x7_sejs_mean_df, nox7_sejs_mean_df)
+
 X_sp[y_dense==1,:]
 np.sum(y_dense)
 np.sum(J)
@@ -449,3 +548,8 @@ for i in range(0,J.shape[0]):
         k += 1
     if i % 10000 == 1:
         print "\rProcessed ", i,
+        
+
+
+a = rand(4,3)
+a[:,[0,2]]
