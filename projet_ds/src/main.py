@@ -245,7 +245,7 @@ def load_sparse(filename):
     loader = np.load(filename)
     return sparse.csr_matrix((loader['data'], loader['indices'], loader['indptr']), shape=loader['shape'])
     
-def check_code(code, column_labels_dict, type_ghm=False, complexity_ghm=False, cmd=False, ccam=False, cim=False, type_um=False, departement=False):
+def check_code(code, type_ghm=False, complexity_ghm=False, cmd=False, ccam=False, cim=False, type_um=False, departement=False):
     """
     Verfifie si un code existe bien dans le referentiel pour
         - type_ghm
@@ -256,24 +256,32 @@ def check_code(code, column_labels_dict, type_ghm=False, complexity_ghm=False, c
         - type_um
         - departement
     """ 
+    global full_column_label_dict
     if cmd:
         code_to_check = 'cmd_' + code
+        return code_to_check in short_column_label_dict
     if type_ghm:
         code_to_check = 'type_ghm_' + code
-    if ccam:
-        code_to_check = 'acte_' + code
-    if cim:
-        code_to_check = 'dp_' + code
+        return code_to_check in short_column_label_dict
     if type_um:
         code_to_check = 'type_um' + code
+        return code_to_check in short_column_label_dict
     if type_ghm:
         code_to_check = 'type_ghm_' + code
+        return code_to_check in short_column_label_dict
     if complexity_ghm:
         code_to_check = 'complexity_ghm_' + code
+        return code_to_check in short_column_label_dict
     if departement:
         code_to_check = 'dpt_' + code
+        return code_to_check in short_column_label_dict
+    if ccam:
+        code_to_check = 'acte_' + code
+        return code_to_check in full_column_label_dict
+    if cim:
+        code_to_check = 'dp_' + code
+        return code_to_check in full_column_label_dict
         
-    return code_to_check in column_labels_dict
 
 
 def is_ano_ok(line, ano_format):
@@ -302,7 +310,7 @@ def is_rsa_ok(line, rsa_format):
     return (mode_sortie_dc + cmd_90 + cmd_28) == 0
 
 
-def get_rsa_data(rsa, rsa_format, cld, verbose=None):
+def get_rsa_data(rsa, rsa_format, verbose=None):
     """
     Retrouve les informations suivntes :
     
@@ -346,6 +354,8 @@ def get_rsa_data(rsa, rsa_format, cld, verbose=None):
         
     """
     
+    global codes_um_urgences_dict
+    
     error = False
     
     rsa = rsa.replace('\n', '')
@@ -355,25 +365,26 @@ def get_rsa_data(rsa, rsa_format, cld, verbose=None):
     sex = int(rsa[rsa_format['sex_sp']-1:rsa_format['sex_ep']].strip())
     
     departement = rsa[rsa_format['finess_sp' ]-1:rsa_format['finess_sp']+1].strip()
-    if (not check_code(departement, cld, departement=True)):
+    if (not check_code(departement, departement=True)):
         if verbose:
             print 'Error in departement %s, RSA ignored' % (departement)
         error = True
         
+
     cmd = rsa[rsa_format['cmd_sp'] - 1:rsa_format['cmd_ep']].strip()
-    if (not check_code(cmd, cld, cmd=True)):
+    if (not check_code(cmd, cmd=True)):
         if verbose:
             print 'Error in CMD %s, RSA ignored' % (cmd)
         error = True
     
     dp = rsa[rsa_format['dp_sp'] - 1:rsa_format['dp_ep']].strip()
-    if (not check_code(dp, cld, cim=True)):
+    if (not check_code(dp, cim=True)):
         if verbose:
             print 'Error in DP %s, RSA ignored' % (dp)
         error = True
         
     dr = rsa[rsa_format['dr_sp'] - 1:rsa_format['dr_ep']].strip()
-    if (len(dr)>0) and (not check_code(dr, cld, cim=True)):
+    if (len(dr)>0) and (not check_code(dr, cim=True)):
         if verbose:
             print 'Error in DR %s, RSA ignored' % (dr)
         error = True
@@ -386,13 +397,13 @@ def get_rsa_data(rsa, rsa_format, cld, verbose=None):
     stay_length = int(rsa[rsa_format['stay_length_sp'] - 1:rsa_format['stay_length_ep']].strip())
     
     type_ghm = rsa[rsa_format['type_ghm_sp']-1:rsa_format['type_ghm_ep']].strip()
-    if (not check_code(type_ghm, cld, type_ghm=True)):
+    if (not check_code(type_ghm, type_ghm=True)):
         if verbose:
             print 'Error in TYPE GHM %s, RSA ignored' % (type_ghm)
         error = True
     
     complexity_ghm = rsa[rsa_format['complexity_ghm_sp']-1:rsa_format['complexity_ghm_ep']].strip()
-    if (not check_code(complexity_ghm, cld, complexity_ghm=True)):
+    if (not check_code(complexity_ghm, complexity_ghm=True)):
         if verbose:
             print 'Error in COMPLEXITY OF GHM %s, RSA ignored' % (complexity_ghm)
         error = True
@@ -421,22 +432,29 @@ def get_rsa_data(rsa, rsa_format, cld, verbose=None):
     
     first_um_sp = fixed_zone_length + (nb_aut_pgv * aut_pgv_length) + (nb_suppl_radio * suppl_radio_length) + type_um_offset
 
+    urgences = 0    
     type_um_dict = {}
     for i in range(0, nb_rum):
         type_um = rsa[first_um_sp: first_um_sp + type_um_length].strip()
-        if (not check_code(type_um, cld, type_um=True)):
+        if (not check_code(type_um, type_um=True)):
             if verbose:
                 print 'Error in TYPE UM %s' % (type_um)
             error = True
         else:
             type_um_dict[type_um] = 1
+            urgences = 1*(type_um in codes_um_urgences_dict)
         first_um_sp += rum_length
+
+    mode_entree_provenance = rsa[rsa_format['mode_entree_provenance_sp'] - 1:rsa_format['mode_entree_provenance_ep']].strip()
+    if (mode_entree_provenance == '58'):
+        urgences = 1
+
         
     first_das_sp = fixed_zone_length + nb_aut_pgv*aut_pgv_length + nb_suppl_radio*suppl_radio_length+nb_rum*rum_length
     das_dict = {}
     for i in range(0, nb_das):
         das = rsa[first_das_sp : first_das_sp + das_length].strip()
-        if (not check_code(das, cld, cim=True)):
+        if (not check_code(das, cim=True)):
             if verbose:
                     print 'Error in DAS %s' % (das)
             error = True
@@ -449,7 +467,7 @@ def get_rsa_data(rsa, rsa_format, cld, verbose=None):
     actes_dict = {}    
     for i in range(0, nb_zones_actes):
         acte = rsa[first_act_sp : first_act_sp + code_ccam_length].strip()
-        if (not check_code(acte, cld, ccam=True)):
+        if (not check_code(acte, ccam=True)):
             if verbose:
                     print 'Error in ACTE %s' % (acte)
             error = True
@@ -459,13 +477,14 @@ def get_rsa_data(rsa, rsa_format, cld, verbose=None):
         
     return error, {
         'index':index,
+        'age':age,
+        'stay_length':stay_length,
         'cmd':cmd,
         'sex':sex,
         'dpt':departement,
         'dp':dp,
         'dr':dr,
-        'age':age,
-        'stay_length':stay_length,
+        'urgences':urgences,
         'type_ghm':type_ghm,
         'complexity_ghm':complexity_ghm,
         'type_um':type_um_dict.keys(),
