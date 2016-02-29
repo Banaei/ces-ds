@@ -18,18 +18,11 @@ from scipy import sparse
 imp.reload(file_paths)
 
 
-full_column_label_dict
-short_column_label_dict
-codes_um_urgences_dict
-
-def fill_codes(codes_file_path, codes_list):
-    """
-    Remplit les listes des referentiels a partir des fichiers texte
-    """
-    with open(codes_file_path) as codes_file:
-        for code in codes_file:
-            codes_list.append(code.strip('\n').strip())
-    codes_list.sort()
+full_column_label_dict = {}
+short_column_label_dict = {}
+codes_um_urgences_dict = {}
+ipe_prive_dict = {}
+    
     
 def add_column_labels_from_file_to_dict(codes_file_path, the_dict, suffix):
     """
@@ -42,13 +35,14 @@ def add_column_labels_from_file_to_dict(codes_file_path, the_dict, suffix):
     
 
 
-def create_and_save_refs():
+def create_and_save_global_refs():
     """
     Cree trois  dicts :
     
     - full_column_label_dict
     - short_column_label_dict
     - codes_um_urgences_dict
+    - ipe_prive_dict
     
     short_column_label_dict a les libelles suivants :
     
@@ -84,12 +78,20 @@ def create_and_save_refs():
     Les deux dicts sont enregistres dans les fichiers full_dict_file_path et short_dict_file_path (renseignes dans le fichier file_paths).
     
     codes_um_urgences_dict contient les codes UM correspondant aux urgences.
+    
+    ipes des ES prives
 
     """
 
+    global full_column_label_dict
+    global short_column_label_dict
+    global codes_um_urgences_dict
+    global ipe_prive_dict
+    
     full_column_label_dict.clear()
     short_column_label_dict.clear()
     codes_um_urgences_dict.clear()
+    ipe_prive_dict.clear()
     
     full_column_label_dict['age'] = 0
     full_column_label_dict['stay_length'] = 0
@@ -112,6 +114,7 @@ def create_and_save_refs():
     short_column_label_dict['sex'] = 0
     short_column_label_dict['emergency'] = 0
     short_column_label_dict['private'] = 0
+    add_column_labels_from_file_to_dict(codes_cmd_file_path, short_column_label_dict, 'cmd_')
     add_column_labels_from_file_to_dict(codes_departement_file_path, short_column_label_dict, 'dpt_')
     add_column_labels_from_file_to_dict(codes_type_ghm_file_path, short_column_label_dict, 'type_ghm_')
     add_column_labels_from_file_to_dict(codes_complexity_ghm_file_path, short_column_label_dict, 'complexity_ghm_')
@@ -149,8 +152,15 @@ def create_and_save_refs():
     with open(codes_um_urgences_dict_file_path, 'w') as f:
         pickle.dump(codes_um_urgences_dict, f)
             
+    with open(ipe_prives_file_path) as codes_file:
+        for code in codes_file:
+            ipe_prive_dict[code.strip('\n').strip()] = 1
 
-def init():
+    with open(ipe_prives_dict_file_path, 'w') as f:
+        pickle.dump(ipe_prive_dict, f)
+            
+
+def init_globals():
     """
     Initialise les variables globales :
     
@@ -162,9 +172,13 @@ def init():
     global full_column_label_dict 
     global short_column_label_dict 
     global codes_um_urgences_dict
+    global ipe_prive_dict
+    
+    
     full_column_label_dict = load_full_column_labels()
     short_column_label_dict = load_short_column_labels()
     codes_um_urgences_dict = load_codes_um_urgences_dict()
+    ipe_prive_dict = load_ipe_private_dict()
 
     
 def save_sparse(filename, array):
@@ -230,20 +244,15 @@ def load_codes_um_urgences_dict(file_path=codes_um_urgences_dict_file_path):
         d = pickle.load(f)
     return d
 
+def load_ipe_private_dict(file_path=ipe_prives_dict_file_path):
+    """
+    Charge le dict des ipe des ES prives
+    Returns : le dict des ipe des ES prives
+    """
+    with open(file_path) as f:
+        d = pickle.load(f)
+    return d
 
-def save_sparse(filename, array):
-    """
-    Enregistre une matrice eparse
-    """
-    np.savez(filename, data=array.data, indices=array.indices, indptr=array.indptr, shape=array.shape)
-
-
-def load_sparse(filename):
-    """
-    Load une matrice eparse
-    """
-    loader = np.load(filename)
-    return sparse.csr_matrix((loader['data'], loader['indices'], loader['indptr']), shape=loader['shape'])
     
 def check_code(code, type_ghm=False, complexity_ghm=False, cmd=False, ccam=False, cim=False, type_um=False, departement=False):
     """
@@ -264,7 +273,7 @@ def check_code(code, type_ghm=False, complexity_ghm=False, cmd=False, ccam=False
         code_to_check = 'type_ghm_' + code
         return code_to_check in short_column_label_dict
     if type_um:
-        code_to_check = 'type_um' + code
+        code_to_check = 'type_um_' + code
         return code_to_check in short_column_label_dict
     if type_ghm:
         code_to_check = 'type_ghm_' + code
@@ -318,8 +327,10 @@ def get_rsa_data(rsa, rsa_format, verbose=None):
         cmd,
         sex,
         departement,
+        private,
         dp,
         dr,
+        urgence,
         age,
         stay_length,
         type_ghm,
@@ -341,8 +352,10 @@ def get_rsa_data(rsa, rsa_format, verbose=None):
                 'cmd': cateorie majeur de diagnostic
                 'sex': sex
                 'dpt': departement (code à deux chiffres)
+                'private': prive
                 'dp': diagnostic principal
                 'dr': diagnostic relie
+                'urgence': admis dans le cadre d'urgence 0/1
                 'age': age
                 'stay_length': duree du sejour
                 'type_ghm': type du groupe homogene de malade (GHM),
@@ -364,7 +377,12 @@ def get_rsa_data(rsa, rsa_format, verbose=None):
     
     sex = int(rsa[rsa_format['sex_sp']-1:rsa_format['sex_ep']].strip())
     
-    departement = rsa[rsa_format['finess_sp' ]-1:rsa_format['finess_sp']+1].strip()
+    finess = rsa[rsa_format['finess_sp' ]-1:rsa_format['finess_ep']].strip()  
+    is_private = 0
+    if (finess in ipe_prive_dict):
+        is_private = 1
+        
+    departement = finess[0:2]
     if (not check_code(departement, departement=True)):
         if verbose:
             print 'Error in departement %s, RSA ignored' % (departement)
@@ -432,22 +450,25 @@ def get_rsa_data(rsa, rsa_format, verbose=None):
     
     first_um_sp = fixed_zone_length + (nb_aut_pgv * aut_pgv_length) + (nb_suppl_radio * suppl_radio_length) + type_um_offset
 
-    urgences = 0    
+    # Un sejour peut etre considere urgence soit si le mode d'entree est 5 et la provenance 8, soit si l'unite medicale
+    # fait partie de la liste des unites medicales urgences
+    urgence = 0    
     type_um_dict = {}
     for i in range(0, nb_rum):
         type_um = rsa[first_um_sp: first_um_sp + type_um_length].strip()
         if (not check_code(type_um, type_um=True)):
             if verbose:
-                print 'Error in TYPE UM %s' % (type_um)
-            error = True
+                print 'Error in TYPE UM %s, TUPE UM skipped' % (type_um)
+#            error = True
         else:
             type_um_dict[type_um] = 1
-            urgences = 1*(type_um in codes_um_urgences_dict)
+            if (type_um in codes_um_urgences_dict):
+                urgence = 1
         first_um_sp += rum_length
 
     mode_entree_provenance = rsa[rsa_format['mode_entree_provenance_sp'] - 1:rsa_format['mode_entree_provenance_ep']].strip()
     if (mode_entree_provenance == '58'):
-        urgences = 1
+        urgence = 1
 
         
     first_das_sp = fixed_zone_length + nb_aut_pgv*aut_pgv_length + nb_suppl_radio*suppl_radio_length+nb_rum*rum_length
@@ -456,8 +477,8 @@ def get_rsa_data(rsa, rsa_format, verbose=None):
         das = rsa[first_das_sp : first_das_sp + das_length].strip()
         if (not check_code(das, cim=True)):
             if verbose:
-                    print 'Error in DAS %s' % (das)
-            error = True
+                    print 'Error in DAS %s, DAS skipped' % (das)
+#            error = True
         else:
             das_dict[das] = 1
         first_das_sp += das_length
@@ -482,9 +503,10 @@ def get_rsa_data(rsa, rsa_format, verbose=None):
         'cmd':cmd,
         'sex':sex,
         'dpt':departement,
+        'private': is_private,
         'dp':dp,
         'dr':dr,
-        'urgences':urgences,
+        'emergency':urgence,
         'type_ghm':type_ghm,
         'complexity_ghm':complexity_ghm,
         'type_um':type_um_dict.keys(),
@@ -548,9 +570,9 @@ def generate_clean_files(ano_in_file_path=ano_file_path_2013, rsa_in_file_path=r
     print '********************************'
 
 
-def detect_rehosps(delai_rehosp=180, ano_file_path=ano_clean_file_path_2013, ano_format=ano_2013_format, rsa_file_path=rsa_clean_file_path_2013, rsa_format=rsa_2013_format, rehosps_file_path=rehosps_180_list_file_path):
+def detect_and_save_rehosps(delai_rehosp=180, ano_file_path=ano_clean_file_path_2013, ano_format=ano_2013_format, rsa_file_path=rsa_clean_file_path_2013, rsa_format=rsa_2013_format, rehosps_file_path=rehosps_180_list_file_path):
     """
-    Detecte les cas de re-hospitalisation parmi les sejours.
+    Detecte les cas de re-hospitalisation parmi les sejours et enregistre la liste .
     
     Parameters
     ----------
@@ -572,6 +594,7 @@ def detect_rehosps(delai_rehosp=180, ano_file_path=ano_clean_file_path_2013, ano
     rehosps_list : une liste dont chaque element est [numero_ano, numero de ligne dans le fichier RSA, delai de rehospitalisation]
         le delai est egal au nombre de jours entre la fin du sejour et le debut du sejour suivant (pour le meme patient bien entendu).
         cette rehosps_list est aussi enregistree dans le fichier rehosps_file_path donne en parametre
+        Cette liste est egalement enregistree sous rehosps_file_path
     """
     result_dict = {}
     line_number = 1
@@ -684,26 +707,28 @@ def plot_rehosps_180j(rehosps_list):
     plt.legend(loc="best")
     plt.show()    
 
-def get_rehosps_as_dict_check_x7j(rehosps_list=None, file_path=rehosps_180_list_file_path, out_file_path=rehosps_x7j_dict_file_pah):
+def create_and_save_rehosps_as_dict_check_x7j(rehosps_list=None, file_path=rehosps_180_list_file_path, out_file_path=rehosps_x7j_dict_file_pah):
     """
     Cette methode verfifie pour chaque line_number (deuxieme element de la liste des rehosps) si le delai 
     de rehospitalisation est un multiple de 7.
     Elle retourne un dict sous la forme {line_number:True/False}
-    Le fait de faire partie de cette liste veut dire qu'il s'agit d'un sejour separe de 7 jours du sejour suivant.
+    Le fait de faire partie de cette liste veut dire qu'il s'agit d'un sejour avec rehospitalisation. Si True c'est que 
+    le delai est un multiple de 7 (jours)
     
     Parametres
     ----------
-    rhl : rehosps_list. 
+    rehosps_list : rehosps_list. 
         Par defaut None, dans ce cas il est chrarge a partir du fichier file_path
     file_path : le chemin vers le fichier contenant rehosps_list (format [numero_ano, numero de ligne dans le fichier RSA, delai de rehospitalisation])
           par defaut : rehosps_180_list_file_path
-    out_file_path : le fichier ou l dict sera enregistre
+    out_file_path : le fichier ou le dict sera enregistre
         default : rehosps_x7j_dict_file_pah
     Returns
     -------
         dict de format {line_number:True/False}
     """
     if (rehosps_list==None):
+        print 'loading rehosps from ', file_path
         rehosps_list = load_rehosps_list(file_path)
 
     result = {}
@@ -716,6 +741,7 @@ def get_rehosps_as_dict_check_x7j(rehosps_list=None, file_path=rehosps_180_list_
         
     with open(out_file_path, 'w') as f:
         pickle.dump(result, f)
+    print 'Rehosps_dict saved to ', out_file_path
 
     return result
 
@@ -732,21 +758,36 @@ def load_rehosps_as_dict_check_x7j(in_file=rehosps_x7j_dict_file_pah):
         return pickle.load(f)
    
 
-def rsa_to_X_short(rsa_data_dict, X, i, cld):
-    d = rsa_data_dict[1]
-    X[i, cld['sex']]=d['sex']
-    X[i, cld['age']]=d['age']
-    X[i, cld['emergency']]=d['emergency']
-    X[i, cld['private']]=d['private']
-    X[i, cld['stay_length']]=d['stay_length']
-    X[i, cld['dpt_' + d['dpt']]]=1
-    X[i, cld['type_ghm_' + d['type_ghm']]]=1
-    X[i, cld['complexity_ghm_' + d['complexity_ghm']]]=1
-    for t_u in d['type_um']:
-        X[i, cld['type_um_' + t_u]]=1
+def rsa_to_X_short(rsa_data_dict, X, i):
+    """
+    Trasforme les informations contenues dans le dict rsa_dict en une ligne (la ligne i) de la matrice X. La colonne
+    ou sera placee chaque information est celle donnee par short_column_label_dict
+    
+    Parameters
+    ----------
+    
+    rsa_dict : le dict contenant les informations du RSA
+        
+    X : La matrice ou il faut ecrire les informations (une ligne)
+        
+    i : la ligne de la matrice
+        
+    """
+    global short_column_label_dict
+    rsa_info_dict = rsa_data_dict[1]
+    X[i, short_column_label_dict['sex']]=rsa_info_dict['sex']
+    X[i, short_column_label_dict['age']]=rsa_info_dict['age']
+    X[i, short_column_label_dict['emergency']]=rsa_info_dict['emergency']
+    X[i, short_column_label_dict['private']]=rsa_info_dict['private']
+    X[i, short_column_label_dict['stay_length']]=rsa_info_dict['stay_length']
+    X[i, short_column_label_dict['dpt_' + rsa_info_dict['dpt']]]=1
+    X[i, short_column_label_dict['type_ghm_' + rsa_info_dict['type_ghm']]]=1
+    X[i, short_column_label_dict['complexity_ghm_' + rsa_info_dict['complexity_ghm']]]=1
+    for t_u in rsa_info_dict['type_um']:
+        X[i, short_column_label_dict['type_um_' + t_u]]=1
 
 
-def create_rsas_rehosps_check_7x(rehosps_dict, cld, rsas_file_path=rsa_clean_file_path_2013, rsa_format=rsa_2013_format, X_out_file_path=X_rehosps_x7j_sparse_file_path, y_out_fle_path=y_rehosps_x7j_sparse_file_path):
+def create_and_save_rsas_rehosps_check_7x_as_sparse_X_y(rehosps_dict, rsas_file_path=rsa_clean_file_path_2013, rsa_format=rsa_2013_format, X_out_file_path=X_rehosps_x7j_sparse_file_path, y_out_fle_path=y_rehosps_x7j_sparse_file_path):
     '''
     This method parses the lines of the file rsas_file_path and takes only those whose line_number (starting from 1) are 
     included in rehosps_dict, i. e. the RSAs with rehosp. It checks if the rehospit delay is a multiple of 7, and sets y=1 in 
@@ -769,13 +810,14 @@ def create_rsas_rehosps_check_7x(rehosps_dict, cld, rsas_file_path=rsa_clean_fil
     Returns
     -------
     X : saprse CSR matrix containing len(cld) columns (features)
-    
+        
     Y : sparse CSR matrix 1 = rehosp delay 1 or multiple of 7 (days), 0 otherwise
     '''
+    global short_column_label_dict
     line_number = 1
     i = 0
     rows_count = len(rehosps_dict)
-    cols_count = len(cld)
+    cols_count = len(short_column_label_dict)
     sparse_X = sparse.lil_matrix((rows_count, cols_count))
     sparse_y = sparse.lil_matrix((rows_count, 1))
 
@@ -783,8 +825,8 @@ def create_rsas_rehosps_check_7x(rehosps_dict, cld, rsas_file_path=rsa_clean_fil
         while True:
             rsa_line = rsa_file.readline().strip()
             if (line_number in rehosps_dict):
-                rsa_data_dict = get_rsa_data(rsa_line, rsa_format, cld)
-                rsa_to_X_short(rsa_data_dict, sparse_X, i, cld)
+                rsa_data_dict = get_rsa_data(rsa_line, rsa_format)
+                rsa_to_X_short(rsa_data_dict, sparse_X, i)
                 if rehosps_dict[line_number]:
                     sparse_y[i] = 1
                 i += 1
@@ -800,16 +842,22 @@ def create_rsas_rehosps_check_7x(rehosps_dict, cld, rsas_file_path=rsa_clean_fil
     save_sparse(y_rehosps_x7j_sparse_file_path, y)
     return X, y    
     
+
+# #########################################
+# Iitialisation des variables globales
+
+init_globals()
     
 #  Test area
     
 if False:
-    create_and_save_refs() # Creating labels
-    init()
-    cld_short = load_short_column_labels()
+    create_and_save_global_refs() # Creating labels
+    init_globals()
     generate_clean_files()
+    detect_and_save_rehosps()
     rehosps_list = load_rehosps_list()
     plot_rehosps_180j(rehosps_list)
+    create_and_save_rehosps_as_dict_check_x7j(rehosps_list=rehosps_list)
     rehosps_dict = load_rehosps_as_dict_check_x7j()
-    X, y = create_rsas_rehosps_check_7x(rehosps_dict, cld_short)
+    X, y = create_and_save_rsas_rehosps_check_7x_as_sparse_X_y(rehosps_dict)
     

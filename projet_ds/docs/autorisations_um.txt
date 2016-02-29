@@ -10,6 +10,8 @@
 07A;UHCD structures des urgences générales 
 07B;UHCD structures des urgences pédiatriques
 08;Soins et accompagnement des malades en phase terminale (unité de soins palliatifs)
+11;chirurgie et anesthésie ambulatoire
+12;hospitalisation à temps partiel
 13A;Réanimation pédiatrique hors grand brûlés
 13B;Réanimation pédiatrique grands brûlés
 14A;Soins surveillance continue pédiatrique hors grands brûlés
