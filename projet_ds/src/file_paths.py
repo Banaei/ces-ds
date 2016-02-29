@@ -29,9 +29,7 @@ codes_complexity_ghm_file_path = refs_directory + 'codes_complexity_ghm.txt'
 codes_um_urgences_file_path = refs_directory + 'codes_type_um_urg.txt'
 ipe_prives_file_path = refs_directory + 'codes_es_prives.txt'
 
-column_label_full_list_file_path = refs_directory + 'full_cll'
 column_label_full_dict_file_path = refs_directory + 'full_cld'
-column_label_short_list_file_path = refs_directory + 'short_cll'
 column_label_short_dict_file_path = refs_directory + 'short_cld'
 
 rfe_file_path = results_directory + 'rfe'

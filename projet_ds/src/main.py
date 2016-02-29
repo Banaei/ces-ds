@@ -15,9 +15,12 @@ import matplotlib.pyplot as plt
 import imp
 from scipy import sparse
 
-
-
 imp.reload(file_paths)
+
+
+full_column_label_dict
+short_column_label_dict
+codes_um_urgences_dict
 
 def fill_codes(codes_file_path, codes_list):
     """
@@ -41,7 +44,26 @@ def add_column_labels_from_file_to_dict(codes_file_path, the_dict, suffix):
 
 def create_and_save_refs():
     """
-    Remplit le dict de libelles de variables :
+    Cree trois  dicts :
+    
+    - full_column_label_dict
+    - short_column_label_dict
+    - codes_um_urgences_dict
+    
+    short_column_label_dict a les libelles suivants :
+    
+    - age
+    - stay_length
+    - private
+    - emergency
+    - sex
+    - dpt_*
+    - type_ghm_*
+    - complexity_ghm_*
+    - type_um_*
+    
+    full_column_label_dict a les libelles suivants
+    
     - age
     - stay_length
     - private
@@ -55,29 +77,34 @@ def create_and_save_refs():
     - dr_*
     - das_*
     - acte_*
-    le dict a comme key le nom de la colonne et comme value le numero de la colonne. Ce numero n'est pas dans l'ordre et depend
+    
+    Cahque dict a comme key le nom de la colonne et comme value le numero de la colonne. Ce numero n'est pas dans l'ordre et depend
     de l'algorithm specifique du dict. Seule certitute : les colonnes age et stay_length ont pour index 0 et 1 respectivement. 
     Il s'agit des seules variables numeriques non binaires que j'ai voulu mettre en premier.
-    Les deux dicts sont enregistres dans les fichiers donnes dans les parametres.
+    Les deux dicts sont enregistres dans les fichiers full_dict_file_path et short_dict_file_path (renseignes dans le fichier file_paths).
+    
+    codes_um_urgences_dict contient les codes UM correspondant aux urgences.
+
     """
 
-    column_label_dict = {}
-    short_column_label_dict = {}
+    full_column_label_dict.clear()
+    short_column_label_dict.clear()
+    codes_um_urgences_dict.clear()
     
-    column_label_dict['age'] = 0
-    column_label_dict['stay_length'] = 0
-    column_label_dict['sex'] = 0
-    column_label_dict['emergency'] = 0
-    column_label_dict['private'] = 0
-    add_column_labels_from_file_to_dict(codes_cmd_file_path, column_label_dict, 'cmd_')
-    add_column_labels_from_file_to_dict(codes_departement_file_path, column_label_dict, 'dpt_')
-    add_column_labels_from_file_to_dict(codes_type_ghm_file_path, column_label_dict, 'type_ghm_')
-    add_column_labels_from_file_to_dict(codes_complexity_ghm_file_path, column_label_dict, 'complexity_ghm_')
-    add_column_labels_from_file_to_dict(codes_type_um_file_path, column_label_dict, 'type_um_')
-    add_column_labels_from_file_to_dict(codes_cim_file_path, column_label_dict, 'dp_')
-    add_column_labels_from_file_to_dict(codes_cim_file_path, column_label_dict, 'dr_')
-    add_column_labels_from_file_to_dict(codes_cim_file_path, column_label_dict, 'das_')
-    add_column_labels_from_file_to_dict(codes_ccam_file_path, column_label_dict, 'acte_')
+    full_column_label_dict['age'] = 0
+    full_column_label_dict['stay_length'] = 0
+    full_column_label_dict['sex'] = 0
+    full_column_label_dict['emergency'] = 0
+    full_column_label_dict['private'] = 0
+    add_column_labels_from_file_to_dict(codes_cmd_file_path, full_column_label_dict, 'cmd_')
+    add_column_labels_from_file_to_dict(codes_departement_file_path, full_column_label_dict, 'dpt_')
+    add_column_labels_from_file_to_dict(codes_type_ghm_file_path, full_column_label_dict, 'type_ghm_')
+    add_column_labels_from_file_to_dict(codes_complexity_ghm_file_path, full_column_label_dict, 'complexity_ghm_')
+    add_column_labels_from_file_to_dict(codes_type_um_file_path, full_column_label_dict, 'type_um_')
+    add_column_labels_from_file_to_dict(codes_cim_file_path, full_column_label_dict, 'dp_')
+    add_column_labels_from_file_to_dict(codes_cim_file_path, full_column_label_dict, 'dr_')
+    add_column_labels_from_file_to_dict(codes_cim_file_path, full_column_label_dict, 'das_')
+    add_column_labels_from_file_to_dict(codes_ccam_file_path, full_column_label_dict, 'acte_')
 
 
     short_column_label_dict['age'] = 0
@@ -91,13 +118,13 @@ def create_and_save_refs():
     add_column_labels_from_file_to_dict(codes_type_um_file_path, short_column_label_dict, 'type_um_')
 
     
-    column_label_dict['age'] = 0
-    column_label_dict['stay_length'] = 1
+    full_column_label_dict['age'] = 0
+    full_column_label_dict['stay_length'] = 1
     index = 2
-    for key in column_label_dict:
+    for key in full_column_label_dict:
         if key=='age' or key=='stay_length':
             continue
-        column_label_dict[key] = index
+        full_column_label_dict[key] = index
         index += 1
 
     short_column_label_dict['age'] = 0
@@ -109,13 +136,12 @@ def create_and_save_refs():
         short_column_label_dict[key] = index
         index += 1
 
-    with open(full_dict_file_path, 'w') as f:
-        pickle.dump(column_label_dict, f)
+    with open(column_label_full_dict_file_path, 'w') as f:
+        pickle.dump(full_column_label_dict, f)
         
-    with open(short_dict_file_path, 'w') as f:
+    with open(column_label_short_dict_file_path, 'w') as f:
         pickle.dump(short_column_label_dict, f)
         
-    codes_um_urgences_dict = {}
     with open(codes_um_urgences_file_path) as codes_file:
         for code in codes_file:
             codes_um_urgences_dict[code.strip('\n').strip()] = 1
@@ -123,6 +149,23 @@ def create_and_save_refs():
     with open(codes_um_urgences_dict_file_path, 'w') as f:
         pickle.dump(codes_um_urgences_dict, f)
             
+
+def init():
+    """
+    Initialise les variables globales :
+    
+    full_column_label_dict
+    short_column_label_dict
+    codes_um_urgences_dict
+    
+    """
+    global full_column_label_dict 
+    global short_column_label_dict 
+    global codes_um_urgences_dict
+    full_column_label_dict = load_full_column_labels()
+    short_column_label_dict = load_short_column_labels()
+    codes_um_urgences_dict = load_codes_um_urgences_dict()
+
     
 def save_sparse(filename, array):
     np.savez(filename, data=array.data, indices=array.indices, indptr=array.indptr, shape=array.shape)
@@ -170,6 +213,22 @@ def load_short_column_labels(dict_file_path=column_label_short_dict_file_path):
     with open(dict_file_path) as f:
         column_label_dict = pickle.load(f)
     return column_label_dict
+
+def load_codes_um_urgences_dict(file_path=codes_um_urgences_dict_file_path):
+    """
+    Lit la liste et le dict des noms de colonnes (version longue) a partir des fichiers et les renvoie
+    - sex
+    - age
+    - stay_length
+    - dpt_*
+    - type_ghm_*
+    - complexity_ghm_*
+    - type_um_*
+    Returns : column_label_list, column_label_dict
+    """
+    with open(file_path) as f:
+        d = pickle.load(f)
+    return d
 
 
 def save_sparse(filename, array):
@@ -726,7 +785,8 @@ def create_rsas_rehosps_check_7x(rehosps_dict, cld, rsas_file_path=rsa_clean_fil
 #  Test area
     
 if False:
-    create_and_save_column_labels() # Creating labels
+    create_and_save_refs() # Creating labels
+    init()
     cld_short = load_short_column_labels()
     generate_clean_files()
     rehosps_list = load_rehosps_list()

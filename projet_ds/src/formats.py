@@ -187,6 +187,8 @@ rsa_2013_format = {
  'sex_ep': 59,
  'exit_month_sp': 62,
  'exit_month_ep': 63,
+ 'mode_entree_provenance_sp': 60,
+ 'mode_entree_provenance_ep': 61,
  'mode_sortie_sp': 68,
  'mode_sortie_ep': 68,
  'stay_length_sp': 71,
