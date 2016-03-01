@@ -14,6 +14,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import imp
 from scipy import sparse
+from sklearn.feature_selection import RFE
+from sklearn.linear_model import LogisticRegression
 
 imp.reload(file_paths)
 
@@ -842,6 +844,44 @@ def create_and_save_rsas_rehosps_check_7x_as_sparse_X_y(rehosps_dict, rsas_file_
     save_sparse(y_rehosps_x7j_sparse_file_path, y)
     return X, y    
     
+def feature_select_rfe_logistic_regression(X, y, n, v=1):
+    """
+    RFE (Recursive Feature Elimination) selon le classifier Logistic Regression.
+    
+    Parameters
+    ----------
+    
+    X : Matrice des features des RSA avec une rehospitalistion.
+        Ses colonnes sont les features
+    y : vecteur des labels. 1 : une duree de rehospitalisation multiple de 7, 0 : une durer de rehospitalisation
+        non multiple de 7.
+        
+    Returns
+    -------
+    
+    rfe : l'objet RFE
+    
+    """
+    model = LogisticRegression()
+    rfe = RFE(model, n, verbose=v)
+    rfe = rfe.fit(X, y.todense())
+    return rfe
+
+def learn_tree(X_data, Y_data, min_depth = 1, max_depth = 10):
+    Y_dense = Y_data.todense()
+    scores = list()
+    print 'Total population size = ', X_data.shape[0]
+    print 'Total number of features =', X_data.shape[1]
+    print 'Total number of labels =', Y_data.shape[0]
+    print 'Proportion of 1 in target=', float(np.sum(Y_dense))/Y_dense.shape[0]
+    print 'Beginning Desicion Tree classification'
+    for depth in range(min_depth, max_depth+1):
+        dtc = DecisionTreeClassifier(criterion='gini', max_depth=depth)
+        dtc.fit(X_data, Y_dense)
+        score = dtc.score(X_data, Y_dense)
+        scores.append((depth, score))
+        print 'depth = ', depth, 'score = ', score
+    return dtc
 
 # #########################################
 # Iitialisation des variables globales
@@ -860,4 +900,5 @@ if False:
     create_and_save_rehosps_as_dict_check_x7j(rehosps_list=rehosps_list)
     rehosps_dict = load_rehosps_as_dict_check_x7j()
     X, y = create_and_save_rsas_rehosps_check_7x_as_sparse_X_y(rehosps_dict)
+    rfe = feature_select_rfe_logistic_regression(X, y, 1)
     
