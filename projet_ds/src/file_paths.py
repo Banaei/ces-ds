@@ -40,5 +40,5 @@ tree_dot_file_path = results_directory + 'dtc.dot'
 tree_pdf_file_path = results_directory + 'dtc.pdf'
 
 rehosps_x7j_dict_file_pah = data_directory + 'rehosps_x7j_dict'
-X_rehosps_x7j_sparse_file_path = data_directory + 'X_rehosps_x7j_sparse_rehosps.npz'
-y_rehosps_x7j_sparse_file_path = data_directory + 'y_rehosps_x7j_sparse_rehosps.npz'
+X_rehosps_x7j_sparse_file_path = data_directory + 'X_rehosps_x7j_sparse.npz'
+y_rehosps_x7j_sparse_file_path = data_directory + 'y_rehosps_x7j_sparse.npz'
