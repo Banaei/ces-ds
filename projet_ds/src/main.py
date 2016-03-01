@@ -867,6 +867,42 @@ def feature_select_rfe_logistic_regression(X, y, n, v=1):
     rfe = rfe.fit(X, y.todense())
     return rfe
 
+def save_rfe(rfe, file_path=rfe_file_path):
+    """
+    Enregistre le RFE sur disque.
+    
+    Parameters
+    ----------
+    
+    rfe : L'objet RFE
+    
+    file_path : le fichier ou il sera enregistre.
+        default : rfe_file_path
+    """
+    with open(file_path, 'w') as f:
+        pickle.dump(rfe, f)
+
+
+def load_rfe(file_path=rfe_file_path):
+    """
+    Charge le RFE a partir du fichier file_path
+    
+    Parameters
+    ----------
+
+    file_path : le fichier du RFE
+        default : rfe_file_path
+        
+    Returns
+    -------
+    
+    rfe : Recusrive Feature Selection 
+    """
+    with open(file_path) as f:
+        rfe = pickle.load(f)
+        return rfe
+
+
 def learn_tree(X_data, Y_data, min_depth = 1, max_depth = 10):
     Y_dense = Y_data.todense()
     scores = list()
@@ -901,4 +937,5 @@ if False:
     rehosps_dict = load_rehosps_as_dict_check_x7j()
     X, y = create_and_save_rsas_rehosps_check_7x_as_sparse_X_y(rehosps_dict)
     rfe = feature_select_rfe_logistic_regression(X, y, 1)
+    save_rfe()
     
