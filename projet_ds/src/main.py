@@ -16,6 +16,9 @@ import imp
 from scipy import sparse
 from sklearn.feature_selection import RFE
 from sklearn.linear_model import LogisticRegression
+import pandas as pd
+
+from sklearn.feature_selection import chi2, f_classif
 
 imp.reload(file_paths)
 
@@ -919,6 +922,127 @@ def learn_tree(X_data, Y_data, min_depth = 1, max_depth = 10):
         print 'depth = ', depth, 'score = ', score
     return dtc
 
+
+def print_and_get_ranked_labels_by_RFE(rfe):
+    """
+    Affiche la liste des features par ordre de leur rang selon RFE
+    
+    Parameters
+    ----------
+    
+    ref : l'objet RFE (Recursive Feature Selection)
+    
+    Returns
+    -------
+    
+    Une liste contenant les labels par ordre de leur rang dans RFE
+    
+    """
+    ranks = rfe.ranking_
+    short_column_labels_indexes_dict = {}
+    for key in short_column_label_dict:
+        index = short_column_label_dict[key]
+        short_column_labels_indexes_dict[index] = key
+    rankes_list = list()
+    for i in range(len(ranks)):
+        rankes_list.append({'rank':ranks[i], 'label':short_column_labels_indexes_dict[i]})
+    rankes_list.sort(key=lambda x:x['rank'])
+    rankes_list_to_return = list()
+    for rank in rankes_list:
+        print rank['rank'], '-->', rank['label']
+        rankes_list_to_return.append(rank['label'])
+    return rankes_list_to_return
+   
+
+def compare_features(X, y, ranked_labels_list, rank, verbose=False):
+    """
+    Calcule les statistiques suivantes pour le feature du rang rank (classes pas RFE) :
+    
+    - Rank
+    - Sum des valeurs pour lesquelles y=1
+    - Sum des valeurs pour lesquelles y=0
+    - Mean des valeurs pour lesquelles y=1
+    - Mean des valeurs pour lesquelles y=0
+    - Le rapport entre les deux Means
+    
+    Parameters
+    ----------
+    
+    X : Matrice sparse contenant les features
+    
+    y : Matrice dense contenant les labels (1 pour delai multiple de 7, 0 pour delai non multiple de 7)
+    
+    rank : le rang demande
+        commence par 0
+    
+    verbose : affichage des resultats
+        default : False
+        
+    Returns
+    -------
+    
+    Un dict de format
+    {
+        Feature : le nom du feature
+        rank : le rang du feature
+        sum y_1 : la somme des valeurs pour y=1
+        sum y_0 : la somme des valeurs pour y=0
+        mean y_1 : la moyenne des valeurs pour y=1
+        mean y_0 : la moyenne des valeurs pour y=0
+        mean_1_to_0 : le rapport mean y_1 / mean y_0
+    }
+    """
+    label_col = short_column_label_dict[ranked_labels_list[rank]]
+    X_feature = X[:, label_col].todense()
+    
+    sum_y_1 = np.sum(X_feature[y==1])
+    sum_y_0 = np.sum(X_feature[y==0])
+    mean_y_1 = np.mean(X_feature[y==1])
+    mean_y_0 = np.mean(X_feature[y==0])    
+    response = {
+        'Feature':ranked_labels_list[rank], 
+        'rank':rank, 
+        'sum_y_1':sum_y_1, 
+        'sum_y_0':sum_y_0, 
+        'mean_y_1':mean_y_1, 
+        'mean_y_0':mean_y_0, 
+        'mean_1_to_0':float(mean_y_1)/mean_y_0}
+    if verbose:
+        print response
+    return response
+    
+
+def print_mean_comparison_stats(X, y, ranked_labels_list):
+    """
+    Affiche pour chaque feature dans l'ordre de la liste ranked_labels_list le rapport des moyennes entre deux groupes : ceux qui ont le label 
+    y==1 (delais de rehosp multiple de 7 jours) et les autres (y==0, delais de rehosp non multiple de 7 j)
+    
+    Parameters
+    ----------
+    X : Matrice sparse contenant les features
+    y : Matrice dense contenant les labels (1 pour delai multiple de 7, 0 pour delai non multiple de 7)
+    ranked_labels_list : la liste des labels par ordre du rang 
+
+    """
+    features_count = y.shape[0]
+    print 'Total des features : ', features_count
+    print 'Total des rehosps avec delai multiple de 7 j (y==1) : ', y[y==1].shape[1]
+    print 'Total des rehosps avec delai non multiple de 7 j (y==0) : ', y[y==0].shape[1]
+    print 'La proportion des rehosps avec delai multiple de 7 j : ', float(y[y==1].shape[1])/features_count
+    
+    df = pd.DataFrame(index=ranked_labels_list, columns=['sum_y_1', 'sum_y_0','mean_y_1', 'mean_y_0', 'mean_1_to_0', 'rfe_rank'])
+    
+    for i in range(len(ranked_labels_list)):
+        d = compare_features(X, y, ranked_labels_list, i)
+        df.set_value(d['Feature'], 'sum_y_1', d['sum_y_1'])
+        df.set_value(d['Feature'], 'sum_y_0', d['sum_y_0'])
+        df.set_value(d['Feature'], 'mean_y_1', d['mean_y_1'])
+        df.set_value(d['Feature'], 'mean_y_0', d['mean_y_0'])
+        df.set_value(d['Feature'], 'mean_1_to_0', d['mean_1_to_0'])
+        df.set_value(d['Feature'], 'rfe_rank', d['rank'])
+        print '\rProcessed ', i,
+    return df
+    
 # #########################################
 # Iitialisation des variables globales
 
@@ -936,6 +1060,24 @@ if False:
     create_and_save_rehosps_as_dict_check_x7j(rehosps_list=rehosps_list)
     rehosps_dict = load_rehosps_as_dict_check_x7j()
     X, y = create_and_save_rsas_rehosps_check_7x_as_sparse_X_y(rehosps_dict)
+    X = load_sparse(X_rehosps_x7j_sparse_file_path)
+    y = load_sparse(y_rehosps_x7j_sparse_file_path).todense()
     rfe = feature_select_rfe_logistic_regression(X, y, 1)
     save_rfe()
+    rfe = load_rfe()
+    ranked_labels_list = print_and_get_ranked_labels_by_RFE(rfe)
+    df = print_mean_comparison_stats(X, y, ranked_labels_list)
+    sorted_df = df.sort(['mean_1_to_0'], ascending =False)
+    
+    chi2, pval_chi2 = chi2(X,y)
+    f_c, pval_f = f_classif(X,y)
+     
+    lr = LogisticRegression()
+    lr.fit(X,y)
+    y_p = lr.predict(X)
+    
+    np.sum(y_p)
+    np.sum(y)
+    np.sum(y_p == np.array(y).T)
+
     
