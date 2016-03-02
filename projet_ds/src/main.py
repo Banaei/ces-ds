@@ -575,9 +575,9 @@ def generate_clean_files(ano_in_file_path=ano_file_path_2013, rsa_in_file_path=r
     print '********************************'
 
 
-def detect_and_save_rehosps(delai_rehosp=180, ano_file_path=ano_clean_file_path_2013, ano_format=ano_2013_format, rsa_file_path=rsa_clean_file_path_2013, rsa_format=rsa_2013_format, rehosps_file_path=rehosps_180_list_file_path):
+def detect_and_save_rehosps_dict(delai_rehosp=180, ano_file_path=ano_clean_file_path_2013, ano_format=ano_2013_format, rsa_file_path=rsa_clean_file_path_2013, rsa_format=rsa_2013_format, rehosps_file_path=rehosps_180_delay_dict_file_path):
     """
-    Detecte les cas de re-hospitalisation parmi les sejours et enregistre la liste .
+    Detecte les cas de re-hospitalisation parmi les sejours et enregistre un dict {line_number:delay} .
     
     Parameters
     ----------
@@ -591,19 +591,19 @@ def detect_and_save_rehosps(delai_rehosp=180, ano_file_path=ano_clean_file_path_
         defult = ano_2013_format
     rsa_format : le format des RSA
         default = rsa_2013_format
-    rehosps_file_path : le fichier ou la liste des rehospitalisations sera enregistree
-        default = rehosps_180_list_file_path
+    rehosps_file_path : le fichier ou le dict des rehospitalisations sera enregistree
+        default = rehosps_180_delay_dict_file_path
     
     Retruns
     -------
-    rehosps_list : une liste dont chaque element est [numero_ano, numero de ligne dans le fichier RSA, delai de rehospitalisation]
+    rehosps__delay_dict : un dict de est {numero de ligne dans le fichier RSA, delai de rehospitalisation}
         le delai est egal au nombre de jours entre la fin du sejour et le debut du sejour suivant (pour le meme patient bien entendu).
-        cette rehosps_list est aussi enregistree dans le fichier rehosps_file_path donne en parametre
-        Cette liste est egalement enregistree sous rehosps_file_path
+        ce rehosps__delay_dict est aussi enregistree dans le fichier rehosps_file_path donne en parametre
+        Ce dict est egalement enregistree sous rehosps_file_path
     """
     result_dict = {}
     line_number = 1
-    rehosps_list = list()
+    rehosps_delay_dict = {}
     with open(ano_file_path) as ano_file:
         with open(rsa_file_path) as rsa_file:
             while True:
@@ -646,7 +646,7 @@ def detect_and_save_rehosps(delai_rehosp=180, ano_file_path=ano_clean_file_path_
                         raise Exception('Error sorting the list : last_sej_num + last_stay_length >= current_sej_num') 
                     delay = last_sej_num + last_stay_length - current_sej_num
                     if delay <= delai_rehosp:
-                        rehosps_list.append([ano_hash_key, last_line_number, delay])
+                        rehosps_delay_dict[last_line_number] = delay
                     last_sej_num = current_sej_num
                     last_stay_length = element_list[i]['stay_length']
                     last_line_number = element_list[i]['line_number']
@@ -654,9 +654,9 @@ def detect_and_save_rehosps(delai_rehosp=180, ano_file_path=ano_clean_file_path_
                 print '\rRehosp detection : processed ', line_number, 
         line_number += 1
     with open(rehosps_file_path, 'w') as out_file:
-        pickle.dump(rehosps_list, out_file)
+        pickle.dump(rehosps_delay_dict, out_file)
     print 'Rehosps saved to ' + rehosps_file_path
-    return rehosps_list
+    return rehosps_delay_dict
 
 def load_rehosps_list(rehosps_list_file_path=rehosps_180_list_file_path):   
     """
@@ -722,7 +722,7 @@ def create_and_save_rehosps_as_dict_check_x7j(rehosps_list=None, file_path=rehos
     
     Parametres
     ----------
-    rehosps_list : rehosps_list. 
+    rehosps_list : rehosps_list. format [numero_ano, numero de ligne dans le fichier RSA, delai de rehospitalisation]
         Par defaut None, dans ce cas il est chrarge a partir du fichier file_path
     file_path : le chemin vers le fichier contenant rehosps_list (format [numero_ano, numero de ligne dans le fichier RSA, delai de rehospitalisation])
           par defaut : rehosps_180_list_file_path
@@ -1054,7 +1054,11 @@ if False:
     create_and_save_global_refs() # Creating labels
     init_globals()
     generate_clean_files()
-    detect_and_save_rehosps()
+
+    detect_and_save_rehosps_dict()
+    
+    
+    
     rehosps_list = load_rehosps_list()
     plot_rehosps_180j(rehosps_list)
     create_and_save_rehosps_as_dict_check_x7j(rehosps_list=rehosps_list)

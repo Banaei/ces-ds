@@ -16,6 +16,7 @@ ano_clean_file_path_2013 = data_directory + 'ano13.clean.txt'
 rsa_clean_file_path_2013 = data_directory + 'rsa13.clean.txt'
 rehosps_365_list_file_path = data_directory + 'rehosps_365_list.txt'
 rehosps_180_list_file_path = data_directory + 'rehosps_180_list.txt'
+rehosps_180_delay_dict_file_path = data_directory + 'rehosps_180_delay_dict.txt'
 
 
 codes_ghm_file_path = refs_directory + 'codes_ghm.txt'
