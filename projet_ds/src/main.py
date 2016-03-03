@@ -658,6 +658,21 @@ def detect_and_save_rehosps_dict(delai_rehosp=180, ano_file_path=ano_clean_file_
     print 'Rehosps saved to ' + rehosps_file_path
     return rehosps_delay_dict
 
+def load_rehosps_dict(file_path=rehosps_180_delay_dict_file_path):   
+    """
+    Load le dict des rehosps a partir du fochier donne en parametre. Le format de ce dict:
+    {numero de ligne dans le fichier RSA:delai de rehospitalisation}
+    le delai est egal au nombre de jours entre la fin du sejour et le debut du sejour suivant (pour le meme patient bien entendu)
+    
+    Parameters
+    ----------
+    file_path : Le fichier des rehosps
+        default : rehosps_180_delay_dict_file_path
+    """         
+    with open(file_path) as rehosps_file:
+        return pickle.load(rehosps_file)
+
+
 def load_rehosps_list(rehosps_list_file_path=rehosps_180_list_file_path):   
     """
     Load la liste des rehosps a partir du fochier donne en parametre. Le format de cette liste (chaque element):
@@ -712,6 +727,47 @@ def plot_rehosps_180j(rehosps_list):
     plt.legend(loc="best")
     plt.show()    
 
+
+def plot_rehosps_180j_dict(rehosps_dict):
+    """
+    Trace la courbe de la repartition des delais de re-hospitalisation.
+    En X : le delai
+    En Y : le nombre de rehops
+    
+    Parameters
+    ----------
+    rehosps_list : Liste des rehosps de format [numero_ano, numero de ligne dans le fichier RSA, delai de rehospitalisation]
+    
+    """
+    delays = np.zeros((len(rehosps_dict),1))
+    i=0
+    for l in rehosps_dict:
+        delays[i]=rehosps_dict[l]
+        i+=1
+       
+    freq = np.zeros(182, dtype=int)
+    for i in range(1, 183):
+        freq[i-1] = np.sum(delays==i)
+    
+    
+    X = np.asarray(range(1,181))
+    X_max = np.asarray(range(7,180, 7))
+    Y_index = np.asarray(range(0,180))
+    Y_index_max = np.asarray(range(6,180, 7))
+    
+    X_no_max = np.asarray([x for x in X if x not in X_max])
+    Y_index_no_max = np.asarray([y for y in Y_index if y not in Y_index_max])
+    
+    plt.plot(X,freq[X-1], 'b-', label='Tout')
+    plt.plot(X_max, freq[Y_index_max],'ro', label='delai = 7, 14, 21, ... jours')
+    plt.plot(X_no_max, freq[Y_index_no_max],'r.', label='delai non multiple de 7')
+    plt.title('Delais de rehospitalisation en 2013')
+    plt.xlabel('Delai entre deux hospitalisation en jours')
+    plt.ylabel('Nombre de sejours')
+    plt.legend(loc="best")
+    plt.show()   
+    
+    
 def create_and_save_rehosps_as_dict_check_x7j(rehosps_list=None, file_path=rehosps_180_list_file_path, out_file_path=rehosps_x7j_dict_file_pah):
     """
     Cette methode verfifie pour chaque line_number (deuxieme element de la liste des rehosps) si le delai 
@@ -790,16 +846,16 @@ def rsa_to_X_short(rsa_data_dict, X, i):
     X[i, short_column_label_dict['complexity_ghm_' + rsa_info_dict['complexity_ghm']]]=1
     for t_u in rsa_info_dict['type_um']:
         X[i, short_column_label_dict['type_um_' + t_u]]=1
+    
 
-
-def create_and_save_rsas_rehosps_check_7x_as_sparse_X_y(rehosps_dict, rsas_file_path=rsa_clean_file_path_2013, rsa_format=rsa_2013_format, X_out_file_path=X_rehosps_x7j_sparse_file_path, y_out_fle_path=y_rehosps_x7j_sparse_file_path):
+def create_and_save_rsas_rehosps_X_y(rehosps_dict, rsas_file_path=rsa_clean_file_path_2013, rsa_format=rsa_2013_format, X_out_file_path=X_rehosps_sparse_file_path, y_out_file_path=y_rehosps_path):
     '''
     This method parses the lines of the file rsas_file_path and takes only those whose line_number (starting from 1) are 
-    included in rehosps_dict, i. e. the RSAs with rehosp. It checks if the rehospit delay is a multiple of 7, and sets y=1 in 
-    this cas
+    included in rehosps_dict, i. e. the RSAs with rehosp. 
+    
     Parameters
     ----------
-    reshosps_dict : {line_number:True/False}
+    reshosps_dict : {line_number:rehosp_delay}
     
     cld : column_labels_dict
     
@@ -808,15 +864,15 @@ def create_and_save_rsas_rehosps_check_7x_as_sparse_X_y(rehosps_dict, rsas_file_
     rsa_format : RSA format
         default : rsa_2013_format
     X_out_file_path : fichier de sauvegarde de X
-        default : X_rehosps_x7j_sparse_file_path
+        default : X_rehosps_sparse_file_path
     y_out_fle_path = fichier de sortie de y
-        default : y_rehosps_x7j_sparse_file_path
+        default : y_rehosps_x_path
         
     Returns
     -------
     X : saprse CSR matrix containing len(cld) columns (features)
         
-    Y : sparse CSR matrix 1 = rehosp delay 1 or multiple of 7 (days), 0 otherwise
+    Y : array contenant le delais de reospitalisation
     '''
     global short_column_label_dict
     line_number = 1
@@ -824,7 +880,7 @@ def create_and_save_rsas_rehosps_check_7x_as_sparse_X_y(rehosps_dict, rsas_file_
     rows_count = len(rehosps_dict)
     cols_count = len(short_column_label_dict)
     sparse_X = sparse.lil_matrix((rows_count, cols_count))
-    sparse_y = sparse.lil_matrix((rows_count, 1))
+    y = np.zeros((rows_count, 1))
 
     with open(rsas_file_path) as rsa_file:
         while True:
@@ -832,8 +888,7 @@ def create_and_save_rsas_rehosps_check_7x_as_sparse_X_y(rehosps_dict, rsas_file_
             if (line_number in rehosps_dict):
                 rsa_data_dict = get_rsa_data(rsa_line, rsa_format)
                 rsa_to_X_short(rsa_data_dict, sparse_X, i)
-                if rehosps_dict[line_number]:
-                    sparse_y[i] = 1
+                y[i] = rehosps_dict[line_number]
                 i += 1
             line_number += 1
             if line_number % 10000 == 0:
@@ -842,9 +897,8 @@ def create_and_save_rsas_rehosps_check_7x_as_sparse_X_y(rehosps_dict, rsas_file_
                 break
 
     X = sparse_X.tocsr()
-    y = sparse_y.tocsr()
-    save_sparse(X_rehosps_x7j_sparse_file_path, X)
-    save_sparse(y_rehosps_x7j_sparse_file_path, y)
+    save_sparse(X_out_file_path, X)
+    np.savez_compressed(y_out_file_path, y=y)
     return X, y    
     
 def feature_select_rfe_logistic_regression(X, y, n, v=1):
@@ -869,6 +923,42 @@ def feature_select_rfe_logistic_regression(X, y, n, v=1):
     rfe = RFE(model, n, verbose=v)
     rfe = rfe.fit(X, y.todense())
     return rfe
+
+def save_np_compressed(array, file_path):
+    """
+    Enregistre l'obj sur disque dans le fichier file_path.
+    Parameters
+    ----------
+    obj : L'objet a enregistrer
+    file_path : le fichier ou il sera enregistre.
+    """    
+    np.savez_compressed(file_path, array)
+
+
+def save_picke(obj, file_path):
+    """
+    Enregistre l'obj sur disque dans le fichier file_path.
+    Parameters
+    ----------
+    obj : L'objet a enregistrer
+    file_path : le fichier ou il sera enregistre.
+    """
+    with open(file_path, 'w') as f:
+        pickle.dump(obj, f)
+    
+    
+def load_picke(file_path):
+    """
+    load l'obj a partir du disque dans le fichier file_path.
+    Parameters
+    ----------
+    obj : L'objet a enregistrer
+    file_path : le fichier ou il sera enregistre.
+    """
+    with open(file_path) as f:
+        return pickle.load(f)
+
+
 
 def save_rfe(rfe, file_path=rfe_file_path):
     """
@@ -1052,20 +1142,20 @@ init_globals()
     
 if False:
     create_and_save_global_refs() # Creating labels
-    init_globals()
     generate_clean_files()
 
     detect_and_save_rehosps_dict()
+    rehosps_dict = load_rehosps_dict()
+    plot_rehosps_180j_dict(rehosps_dict)
+    X, y = create_and_save_rsas_rehosps_X_y(rehosps_dict)
+    np.savez_compressed(y_rehosps_path, y=y)
+    y2 = np.load(y_rehosps_path)
+    y==y2['y']
+    
+    X = load_sparse(X_rehosps_sparse_file_path)
+    y = load_picke(y_rehosps_x_path)
     
     
-    
-    rehosps_list = load_rehosps_list()
-    plot_rehosps_180j(rehosps_list)
-    create_and_save_rehosps_as_dict_check_x7j(rehosps_list=rehosps_list)
-    rehosps_dict = load_rehosps_as_dict_check_x7j()
-    X, y = create_and_save_rsas_rehosps_check_7x_as_sparse_X_y(rehosps_dict)
-    X = load_sparse(X_rehosps_x7j_sparse_file_path)
-    y = load_sparse(y_rehosps_x7j_sparse_file_path).todense()
     rfe = feature_select_rfe_logistic_regression(X, y, 1)
     save_rfe()
     rfe = load_rfe()
