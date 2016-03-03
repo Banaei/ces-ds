@@ -17,6 +17,10 @@ from scipy import sparse
 from sklearn.feature_selection import RFE
 from sklearn.linear_model import LogisticRegression
 import pandas as pd
+from sklearn.tree import DecisionTreeClassifier
+from sklearn import tree
+import os
+from sklearn.linear_model import LogisticRegression
 
 from sklearn.feature_selection import chi2, f_classif
 
@@ -27,7 +31,7 @@ full_column_label_dict = {}
 short_column_label_dict = {}
 codes_um_urgences_dict = {}
 ipe_prive_dict = {}
-    
+short_column_label_list = list()    
     
 def add_column_labels_from_file_to_dict(codes_file_path, the_dict, suffix):
     """
@@ -178,12 +182,20 @@ def init_globals():
     global short_column_label_dict 
     global codes_um_urgences_dict
     global ipe_prive_dict
+    global short_column_label_list
     
     
     full_column_label_dict = load_full_column_labels()
     short_column_label_dict = load_short_column_labels()
     codes_um_urgences_dict = load_codes_um_urgences_dict()
     ipe_prive_dict = load_ipe_private_dict()
+    
+    short_column_labels_indexes_dict = {}
+    for key in short_column_label_dict:
+        index = short_column_label_dict[key]
+        short_column_labels_indexes_dict[index] = key
+    for i in range(len(short_column_labels_indexes_dict)):
+        short_column_label_list.append(short_column_labels_indexes_dict[i])
 
     
 def save_sparse(filename, array):
@@ -996,22 +1008,6 @@ def load_rfe(file_path=rfe_file_path):
         return rfe
 
 
-def learn_tree(X_data, Y_data, min_depth = 1, max_depth = 10):
-    Y_dense = Y_data.todense()
-    scores = list()
-    print 'Total population size = ', X_data.shape[0]
-    print 'Total number of features =', X_data.shape[1]
-    print 'Total number of labels =', Y_data.shape[0]
-    print 'Proportion of 1 in target=', float(np.sum(Y_dense))/Y_dense.shape[0]
-    print 'Beginning Desicion Tree classification'
-    for depth in range(min_depth, max_depth+1):
-        dtc = DecisionTreeClassifier(criterion='gini', max_depth=depth)
-        dtc.fit(X_data, Y_dense)
-        score = dtc.score(X_data, Y_dense)
-        scores.append((depth, score))
-        print 'depth = ', depth, 'score = ', score
-    return dtc
-
 
 def print_and_get_ranked_labels_by_RFE(rfe):
     """
@@ -1102,9 +1098,9 @@ def compare_features(X, y, ranked_labels_list, rank, verbose=False):
     return response
     
 
-def print_mean_comparison_stats(X, y, ranked_labels_list):
+def get_mean_comparison_stats_as_df(X, y, ranked_labels_list):
     """
-    Affiche pour chaque feature dans l'ordre de la liste ranked_labels_list le rapport des moyennes entre deux groupes : ceux qui ont le label 
+    Produit un DataFrame et affiche pour chaque feature dans l'ordre de la liste ranked_labels_list le rapport des moyennes entre deux groupes : ceux qui ont le label 
     y==1 (delais de rehosp multiple de 7 jours) et les autres (y==0, delais de rehosp non multiple de 7 j)
     
     Parameters
@@ -1112,13 +1108,18 @@ def print_mean_comparison_stats(X, y, ranked_labels_list):
     X : Matrice sparse contenant les features
     y : Matrice dense contenant les labels (1 pour delai multiple de 7, 0 pour delai non multiple de 7)
     ranked_labels_list : la liste des labels par ordre du rang 
+    
+    Returns
+    -------
+    
+    dataFrame
 
     """
-    features_count = y.shape[0]
+    features_count = len(y[y==0])
     print 'Total des features : ', features_count
-    print 'Total des rehosps avec delai multiple de 7 j (y==1) : ', y[y==1].shape[1]
-    print 'Total des rehosps avec delai non multiple de 7 j (y==0) : ', y[y==0].shape[1]
-    print 'La proportion des rehosps avec delai multiple de 7 j : ', float(y[y==1].shape[1])/features_count
+    print 'Total des rehosps avec delai multiple de 7 j (y==1) : ', len(y[y==1])
+    print 'Total des rehosps avec delai non multiple de 7 j (y==0) : ', len(y[y==0])
+    print 'La proportion des rehosps avec delai multiple de 7 j : ', float(len(y[y==1]))/features_count
     
     df = pd.DataFrame(index=ranked_labels_list, columns=['sum_y_1', 'sum_y_0','mean_y_1', 'mean_y_0', 'mean_1_to_0', 'rfe_rank'])
     
@@ -1132,9 +1133,60 @@ def print_mean_comparison_stats(X, y, ranked_labels_list):
         df.set_value(d['Feature'], 'rfe_rank', d['rank'])
         print '\rProcessed ', i,
     return df
+
+
+def learn_tree(X_data, Y_data, min_depth = 1, max_depth = 3, dtc_fp=dtc_file_path, dot_fp = tree_dot_file_path, pdf_fp=tree_pdf_file_path):
+    """
+    Classification par arbre
+    
+    Parameters
+    ----------
+    
+    X_data : sparse CSR matrice contenant les features
+    
+    Y_data : dense vecteur contenant les labels
+    
+    min_depth : profondeur minimum
+        default = 1
+    max_depth : profondeur maximum
+        default=3
+    dtc_fp : fichier de sauvegarde du classifier
+        default : dtc_file_path (defini dans file_paths.py)
+    dot_fp : fichier *.dot resultat de la classification
+        default : tree_dot_file_path (defini dans file_paths.py)
+    pdf_fp : fichier de sortie PDF de l'arbre
+        default : tree_pdf_file_path (defini dans file_paths.py)
+    """
+    scores = list()
+    print 'Total population size = ', X_data.shape[0]
+    print 'Total number of features =', X_data.shape[1]
+    print 'Total number of labels =', len(Y_data)
+    print 'Proportion of 1 in target=', float(np.sum(Y_data))/len(Y_data)
+    print 'Beginning Desicion Tree classification'
+    for depth in range(min_depth, max_depth+1):
+        dtc = DecisionTreeClassifier(criterion='gini', max_depth=depth)
+        dtc.fit(X_data, Y_data)
+        score = dtc.score(X_data, Y_data)
+        scores.append((depth, score))
+        print 'depth = ', depth, 'score = ', score
+
+    with open(dtc_fp, 'w') as f:
+        pickle.dump(dtc, f)
+
+    f = tree.export_graphviz(dtc, out_file=dot_fp, feature_names=short_column_label_list) # clf: tree classifier
+    os.system("dot -Tpdf " + dot_fp + " -o " + pdf_fp)
+    return dtc
+
+
+
+
     
 # #########################################
 # Iitialisation des variables globales
+
+def convert_to_is_multipe_of_7(y):
+    return np.ravel( [(lambda x:1*(x>0)*((x%7)==0))(x) for x in y])
+
 
 init_globals()
     
@@ -1148,20 +1200,35 @@ if False:
     rehosps_dict = load_rehosps_dict()
     plot_rehosps_180j_dict(rehosps_dict)
     X, y = create_and_save_rsas_rehosps_X_y(rehosps_dict)
-    np.savez_compressed(y_rehosps_path, y=y)
-    y2 = np.load(y_rehosps_path)
-    y==y2['y']
-    
+
     X = load_sparse(X_rehosps_sparse_file_path)
-    y = load_picke(y_rehosps_x_path)
+    y = np.load(y_rehosps_path)['y']
+    y_x7 = convert_to_is_multipe_of_7(y)
+
+
+    learn_tree(X, y_x7)
+
+    lr = LogisticRegression(verbose=1)
+    lr.fit(X, y_x7)
+    print 'coeffs : ', lr.coef_
+    print 'score', lr.score(X, y_x7)
+    y_p = lr.predict(X)
+    float(np.sum(y_p))/len(y_p)
+    float(np.sum(y_x7))/len(y_x7)
+
+
     
-    
+    (X[:,4]==1).todense()
+    X_lil = X.tolil()
+    X_lil[:,3]=0
+    X_3 = X_lil.tocsr()
+
     rfe = feature_select_rfe_logistic_regression(X, y, 1)
     save_rfe()
     rfe = load_rfe()
     ranked_labels_list = print_and_get_ranked_labels_by_RFE(rfe)
-    df = print_mean_comparison_stats(X, y, ranked_labels_list)
-    sorted_df = df.sort(['mean_1_to_0'], ascending =False)
+    df = print_mean_comparison_stats(X, y_x7, ranked_labels_list)
+    sorted_df = df.sort(['rfe_rank'])
     
     chi2, pval_chi2 = chi2(X,y)
     f_c, pval_f = f_classif(X,y)
