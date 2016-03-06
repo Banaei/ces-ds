@@ -102,8 +102,17 @@ def create_and_save_global_refs():
     codes_um_urgences_dict.clear()
     ipe_prive_dict.clear()
     
-    full_column_label_dict['age'] = 0
-    full_column_label_dict['stay_length'] = 0
+    for i in range(0,76,5):
+        full_column_label_dict['age_' + str(i)] = 0
+    
+    full_column_label_dict['stay_length_0'] = 0
+    full_column_label_dict['stay_length_1'] = 0
+    full_column_label_dict['stay_length_2'] = 0
+    full_column_label_dict['stay_length_3'] = 0
+    full_column_label_dict['stay_length_4'] = 0
+
+    for i in range(5,66,5):
+        full_column_label_dict['stay_length_' + str(i)] = 0
     full_column_label_dict['sex'] = 0
     full_column_label_dict['emergency'] = 0
     full_column_label_dict['private'] = 0
@@ -117,9 +126,15 @@ def create_and_save_global_refs():
     add_column_labels_from_file_to_dict(codes_cim_file_path, full_column_label_dict, 'das_')
     add_column_labels_from_file_to_dict(codes_ccam_file_path, full_column_label_dict, 'acte_')
 
-
-    short_column_label_dict['age'] = 0
-    short_column_label_dict['stay_length'] = 0
+    for i in range(0,76,5):
+        short_column_label_dict['age_' + str(i)] = 0
+    short_column_label_dict['stay_length_0'] = 0
+    short_column_label_dict['stay_length_1'] = 0
+    short_column_label_dict['stay_length_2'] = 0
+    short_column_label_dict['stay_length_3'] = 0
+    short_column_label_dict['stay_length_4'] = 0
+    for i in range(5,66,5):
+        short_column_label_dict['stay_length_' + str(i)] = 0
     short_column_label_dict['sex'] = 0
     short_column_label_dict['emergency'] = 0
     short_column_label_dict['private'] = 0
@@ -130,18 +145,14 @@ def create_and_save_global_refs():
     add_column_labels_from_file_to_dict(codes_type_um_file_path, short_column_label_dict, 'type_um_')
 
     
-    full_column_label_dict['age'] = 0
-    full_column_label_dict['stay_length'] = 1
-    index = 2
+    index = 0
     for key in full_column_label_dict:
         if key=='age' or key=='stay_length':
             continue
         full_column_label_dict[key] = index
         index += 1
 
-    short_column_label_dict['age'] = 0
-    short_column_label_dict['stay_length'] = 1
-    index = 2
+    index = 0
     for key in short_column_label_dict:
         if key=='age' or key=='stay_length':
             continue
@@ -589,7 +600,9 @@ def generate_clean_files(ano_in_file_path=ano_file_path_2013, rsa_in_file_path=r
 
 def detect_and_save_rehosps_dict(delai_rehosp=180, ano_file_path=ano_clean_file_path_2013, ano_format=ano_2013_format, rsa_file_path=rsa_clean_file_path_2013, rsa_format=rsa_2013_format, rehosps_file_path=rehosps_180_delay_dict_file_path):
     """
-    Detecte les cas de re-hospitalisation parmi les sejours et enregistre un dict {line_number:delay} .
+    Detecte les cas de re-hospitalisation parmi les sejours et enregistre un dict {line_number:[[delay_start_to_start, delay_end_to_start]]}.
+    Le delai debut au debut est le delai en jous qui separe le debut d'un sejour du debut du sejour suivant. Le delai fin au debut est le nombre
+    de jours qui separe la fin deun sejour du debt du suivant.
     
     Parameters
     ----------
@@ -608,7 +621,7 @@ def detect_and_save_rehosps_dict(delai_rehosp=180, ano_file_path=ano_clean_file_
     
     Retruns
     -------
-    rehosps__delay_dict : un dict de est {numero de ligne dans le fichier RSA, delai de rehospitalisation}
+    rehosps__delay_dict : un dict de est {numero de ligne dans le fichier RSA:[delai debut au debut, delai fin au début]}
         le delai est egal au nombre de jours entre la fin du sejour et le debut du sejour suivant (pour le meme patient bien entendu).
         ce rehosps__delay_dict est aussi enregistree dans le fichier rehosps_file_path donne en parametre
         Ce dict est egalement enregistree sous rehosps_file_path
@@ -636,38 +649,42 @@ def detect_and_save_rehosps_dict(delai_rehosp=180, ano_file_path=ano_clean_file_
     print 'Results dict length ' + str(len(result_dict))
     print 'Starting rehosps detection ...'
     line_number = 1
+    error_number = 0
     for ano_hash_key in result_dict.keys():
         element_list = result_dict[ano_hash_key]
         if (len(element_list)>1):
-            element_list.sort(key=lambda x:x['sej_num'], reverse=True)
-            first_loop = True
+            element_list.sort(key=lambda x:x['sej_num'])
+            first_stay = True
             last_sej_num = 0
             last_stay_length = 0
             last_line_number = 0
             current_sej_num = 0
-            for i in range(0,len(element_list)):
-                if (first_loop):
-                    last_sej_num = element_list[i]['sej_num']
-                    last_stay_length = element_list[i]['stay_length']
-                    last_line_number = element_list[i]['line_number']
-                    first_loop = False
+            for element in element_list:
+                if (first_stay):
+                    last_sej_num = element['sej_num']
+                    last_stay_length = element['stay_length']
+                    last_line_number = element['line_number']
+                    first_stay = False
                     continue
                 else:
-                    current_sej_num = element_list[i]['sej_num']
-                    if (last_sej_num + last_stay_length < current_sej_num):
-                        raise Exception('Error sorting the list : last_sej_num + last_stay_length >= current_sej_num') 
-                    delay = last_sej_num + last_stay_length - current_sej_num
-                    if delay <= delai_rehosp:
-                        rehosps_delay_dict[last_line_number] = delay
+                    current_sej_num = element['sej_num']
+                    delay_start_to_start = current_sej_num - last_sej_num
+                    delay_end_to_start = current_sej_num - (last_sej_num + last_stay_length)
+                    if (delay_start_to_start<0):
+                        error_number += 1
+                        break
+                    if (delay_start_to_start <= delai_rehosp) or (delay_end_to_start <= delai_rehosp):
+                        rehosps_delay_dict[last_line_number] = [delay_start_to_start, delay_end_to_start]
                     last_sej_num = current_sej_num
-                    last_stay_length = element_list[i]['stay_length']
-                    last_line_number = element_list[i]['line_number']
+                    last_stay_length = element['stay_length']
+                    last_line_number = element['line_number']
         if line_number % 100000 == 0:
-                print '\rRehosp detection : processed ', line_number, 
+                print '\rRehosp detection : processed ', line_number, 'Errors : ', error_number,
         line_number += 1
     with open(rehosps_file_path, 'w') as out_file:
         pickle.dump(rehosps_delay_dict, out_file)
     print 'Rehosps saved to ' + rehosps_file_path
+    print 'Errors ', error_number
     return rehosps_delay_dict
 
 def load_rehosps_dict(file_path=rehosps_180_delay_dict_file_path):   
@@ -700,7 +717,9 @@ def load_rehosps_list(rehosps_list_file_path=rehosps_180_list_file_path):
         return pickle.load(rehosps_file)
 
 
-def plot_rehosps_180j(rehosps_list):
+
+
+def plot_rehosps_180j_dict(rehosps_dict, type_delai):
     """
     Trace la courbe de la repartition des delais de re-hospitalisation.
     En X : le delai
@@ -708,39 +727,44 @@ def plot_rehosps_180j(rehosps_list):
     
     Parameters
     ----------
-    rehosps_list : Liste des rehosps de format [numero_ano, numero de ligne dans le fichier RSA, delai de rehospitalisation]
+    rehosps_dict : Dict des rehosps de format {numero de ligne dans le fichier RSA : delai de rehospitalisation}
     
+    type_delai : 0 pour start to start, 1 pour end to start
     """
-    delays = np.zeros((len(rehosps_list),1))
+    gaps = np.zeros((len(rehosps_dict),1))
     i=0
-    for l in rehosps_list:
-        delays[i]=l[2]
+    for l in rehosps_dict:
+        gaps[i]=rehosps_dict[l][type_delai]
         i+=1
        
     freq = np.zeros(182, dtype=int)
-    for i in range(1, 183):
-        freq[i-1] = np.sum(delays==i)
+    for i in range(0, 182):
+        freq[i] = np.sum(gaps==i)
     
     
-    X = np.asarray(range(1,181))
-    X_max = np.asarray(range(7,180, 7))
+    X = np.asarray(range(0,180))
+    X_max = np.asarray(range(0,180, 7))
     Y_index = np.asarray(range(0,180))
-    Y_index_max = np.asarray(range(6,180, 7))
+    Y_index_max = np.asarray(range(0,180, 7))
     
     X_no_max = np.asarray([x for x in X if x not in X_max])
     Y_index_no_max = np.asarray([y for y in Y_index if y not in Y_index_max])
     
-    plt.plot(X,freq[X-1], 'b-', label='Tout')
+    plt.plot(X,freq[X], 'b-', label='Tout')
     plt.plot(X_max, freq[Y_index_max],'ro', label='delai = 7, 14, 21, ... jours')
     plt.plot(X_no_max, freq[Y_index_no_max],'r.', label='delai non multiple de 7')
-    plt.title('Delais de rehospitalisation en 2013')
+    if type_delai==0:
+        title = 'Delais de rehospitalisation (debut au debut) en 2013'
+    else:
+        title = 'Delais de rehospitalisation (fin au debut) en 2013'
+    plt.title(title)
     plt.xlabel('Delai entre deux hospitalisation en jours')
     plt.ylabel('Nombre de sejours')
     plt.legend(loc="best")
-    plt.show()    
-
-
-def plot_rehosps_180j_dict(rehosps_dict):
+    plt.show()   
+    
+    
+def plot_rehosps_180j_array(rehosp_delay_array):
     """
     Trace la courbe de la repartition des delais de re-hospitalisation.
     En X : le delai
@@ -748,29 +772,23 @@ def plot_rehosps_180j_dict(rehosps_dict):
     
     Parameters
     ----------
-    rehosps_list : Liste des rehosps de format [numero_ano, numero de ligne dans le fichier RSA, delai de rehospitalisation]
+    rehosp_delay_array : Array de delai de rehospitalisation
     
     """
-    delays = np.zeros((len(rehosps_dict),1))
-    i=0
-    for l in rehosps_dict:
-        delays[i]=rehosps_dict[l]
-        i+=1
-       
     freq = np.zeros(182, dtype=int)
-    for i in range(1, 183):
-        freq[i-1] = np.sum(delays==i)
+    for i in range(0, 182):
+        freq[i] = np.sum(rehosp_delay_array==i)
     
     
-    X = np.asarray(range(1,181))
+    X = np.asarray(range(0,180))
     X_max = np.asarray(range(7,180, 7))
     Y_index = np.asarray(range(0,180))
-    Y_index_max = np.asarray(range(6,180, 7))
+    Y_index_max = np.asarray(range(7,180, 7))
     
     X_no_max = np.asarray([x for x in X if x not in X_max])
     Y_index_no_max = np.asarray([y for y in Y_index if y not in Y_index_max])
     
-    plt.plot(X,freq[X-1], 'b-', label='Tout')
+    plt.plot(X,freq[X], 'b-', label='Tout')
     plt.plot(X_max, freq[Y_index_max],'ro', label='delai = 7, 14, 21, ... jours')
     plt.plot(X_no_max, freq[Y_index_no_max],'r.', label='delai non multiple de 7')
     plt.title('Delais de rehospitalisation en 2013')
@@ -778,6 +796,8 @@ def plot_rehosps_180j_dict(rehosps_dict):
     plt.ylabel('Nombre de sejours')
     plt.legend(loc="best")
     plt.show()   
+    
+
     
     
 def create_and_save_rehosps_as_dict_check_x7j(rehosps_list=None, file_path=rehosps_180_list_file_path, out_file_path=rehosps_x7j_dict_file_pah):
@@ -848,11 +868,39 @@ def rsa_to_X_short(rsa_data_dict, X, i):
     """
     global short_column_label_dict
     rsa_info_dict = rsa_data_dict[1]
+    age = rsa_info_dict['age']
+    stay_length = rsa_info_dict['stay_length']
+    
+    if age==0:
+        X[i, short_column_label_dict['age_0']] = 1
+    else:
+        if age>70:
+            age=71
+        if age%5==0:
+            X[i, short_column_label_dict['age_'+str(age)]] = 1
+        else:
+            X[i, short_column_label_dict['age_'+str(((age/5)+1)*5)]] = 1
+    
+    if stay_length==0:
+        X[i, short_column_label_dict['stay_length_0']] = 1
+    elif stay_length==1:
+        X[i, short_column_label_dict['stay_length_1']] = 1
+    elif stay_length==2:
+        X[i, short_column_label_dict['stay_length_2']] = 1
+    elif stay_length==3:
+        X[i, short_column_label_dict['stay_length_3']] = 1
+    elif stay_length==4:
+        X[i, short_column_label_dict['stay_length_4']] = 1
+    else:
+        if stay_length>60:
+            stay_length=61
+        if stay_length%5==0:
+            X[i, short_column_label_dict['stay_length_'+str(stay_length)]] = 1
+        else:
+            X[i, short_column_label_dict['stay_length_'+str(((stay_length/5)+1)*5)]] = 1
     X[i, short_column_label_dict['sex']]=rsa_info_dict['sex']
-    X[i, short_column_label_dict['age']]=rsa_info_dict['age']
     X[i, short_column_label_dict['emergency']]=rsa_info_dict['emergency']
     X[i, short_column_label_dict['private']]=rsa_info_dict['private']
-    X[i, short_column_label_dict['stay_length']]=rsa_info_dict['stay_length']
     X[i, short_column_label_dict['dpt_' + rsa_info_dict['dpt']]]=1
     X[i, short_column_label_dict['type_ghm_' + rsa_info_dict['type_ghm']]]=1
     X[i, short_column_label_dict['complexity_ghm_' + rsa_info_dict['complexity_ghm']]]=1
@@ -892,7 +940,8 @@ def create_and_save_rsas_rehosps_X_y(rehosps_dict, rsas_file_path=rsa_clean_file
     rows_count = len(rehosps_dict)
     cols_count = len(short_column_label_dict)
     sparse_X = sparse.lil_matrix((rows_count, cols_count))
-    y = np.zeros((rows_count, 1))
+    y_sts = np.zeros((rows_count, 1))
+    y_ets = np.zeros((rows_count, 1))
 
     with open(rsas_file_path) as rsa_file:
         while True:
@@ -900,7 +949,8 @@ def create_and_save_rsas_rehosps_X_y(rehosps_dict, rsas_file_path=rsa_clean_file
             if (line_number in rehosps_dict):
                 rsa_data_dict = get_rsa_data(rsa_line, rsa_format)
                 rsa_to_X_short(rsa_data_dict, sparse_X, i)
-                y[i] = rehosps_dict[line_number]
+                y_sts[i] = rehosps_dict[line_number][0]
+                y_ets[i] = rehosps_dict[line_number][1]
                 i += 1
             line_number += 1
             if line_number % 10000 == 0:
@@ -910,8 +960,8 @@ def create_and_save_rsas_rehosps_X_y(rehosps_dict, rsas_file_path=rsa_clean_file
 
     X = sparse_X.tocsr()
     save_sparse(X_out_file_path, X)
-    np.savez_compressed(y_out_file_path, y=y)
-    return X, y    
+    np.savez_compressed(y_out_file_path, y_sts=y_sts, y_ets=y_ets)
+    return X, y_sts, y_ets    
     
 def feature_select_rfe_logistic_regression(X, y, n, v=1):
     """
@@ -933,7 +983,7 @@ def feature_select_rfe_logistic_regression(X, y, n, v=1):
     """
     model = LogisticRegression()
     rfe = RFE(model, n, verbose=v)
-    rfe = rfe.fit(X, y.todense())
+    rfe = rfe.fit(X, y)
     return rfe
 
 def save_np_compressed(array, file_path):
@@ -1106,7 +1156,9 @@ def get_mean_comparison_stats_as_df(X, y, ranked_labels_list):
     Parameters
     ----------
     X : Matrice sparse contenant les features
+    
     y : Matrice dense contenant les labels (1 pour delai multiple de 7, 0 pour delai non multiple de 7)
+    
     ranked_labels_list : la liste des labels par ordre du rang 
     
     Returns
@@ -1178,8 +1230,132 @@ def learn_tree(X_data, Y_data, min_depth = 1, max_depth = 3, dtc_fp=dtc_file_pat
     return dtc
 
 
+def learn_lr(X,y):
+    lr = LogisticRegression(verbose=1)
+    lr.fit(X, y)
+    return lr
+    
+
+def plot_y_rehosps(X_param, y_param, feature_to_test_list):
+    """
+    Trace la courbe de la repartition des delais de re-hospitalisation. Il 'agit de 3 courbes :
+    Une premiere avec les cas ou au moins l'un des features de la liste feature_to_test_list = 1
+    Une deuxieme avec aucun des features = 0
+    Une troisieme en pointilles le tout
+    
+    En axes des X : le delai
+    En axe des Y : le nombre de rehops
+    
+    Parameters
+    ----------
+    X_param : matrice des features
+    y_param : vecteur des delais de rehosp
+    feature_to_test_list : les features a tester. Deux courbes seront tracees une avec au moins l'un de ces features =0 et l'autre avec aucun = 1
+    
+    """
+    indexes_avec = numpy.zeros(y_param.shape, dtype=bool)
+    for feature_to_test in feature_to_test_list:
+        indexes_avec = indexes_avec + (X_param[:,short_column_label_dict[feature_to_test]]==1).todense()
+    indexes_sans = np.invert(indexes_avec)
+        
+        
+    delays_avec = y_param[indexes_avec]
+    delays_sans = y_param[indexes_sans]
+
+    
+    freq_avec = np.zeros(182, dtype=int)
+    freq_sans = np.zeros(182, dtype=int)
+    
+    for i in range(0, 182):
+        freq_avec[i] = np.sum(delays_avec==i)
+        freq_sans[i] = np.sum(delays_sans==i)
+    
+    
+    X = np.asarray(range(0,180))
+    X_max = np.asarray(range(7,180, 7))
+    X_no_max = np.asarray([a for a in X if a not in X_max])
+    
+#    plt.plot(X,freq[X], 'k--', label='Tout')
+    plt.figure(1)
+    plt.subplot(211)
+    plt.plot(X,freq_avec[X], 'b-', label='Avec')
+    plt.plot(X_max, freq_avec[X_max],'ro', label='delai = 7, 14, 21, ... jours')
+    plt.plot(X_no_max, freq_avec[X_no_max],'r.', label='delai non multiple de 7')
+    plt.title('Delais de rehospitalisation en 2013 avec ' + str(feature_to_test_list))
+    plt.xlabel('Delai entre deux hospitalisation en jours')
+    plt.ylabel('Nombre de sejours')
+    plt.legend(loc="best")
+
+    plt.subplot(212)
+    plt.plot(X,freq_sans[X], 'g-', label='Sans')
+    plt.plot(X_max, freq_sans[X_max],'ro')
+    plt.plot(X_no_max, freq_sans[X_no_max],'r.')
+    plt.title('Delais de rehospitalisation en 2013 sans ' + str(feature_to_test_list))
+    plt.xlabel('Delai entre deux hospitalisation en jours')
+    plt.ylabel('Nombre de sejours')
+    plt.legend(loc="best")
+    plt.show()   
 
 
+def calcul_mean_diff(X_param, y_param, feature_to_test, n=2, lim=70):
+    """
+    Calcule la difference moyenne ponderee entre les delais multiples de 7 et leurs voisins de -n a +n.
+    Exemple, il calcule le rapport entre le nombre de rehospits a 7j et la moyenne des nombres des rehospits
+    a 5, 6, 8 et 9 jours si n=2. il calcul ce rapport pour tous les multiples de 7 jusque lim et retorune la 
+    moyenne ponderee de ces rapports
+    
+    Parameters
+    ----------
+    
+    X_param : matrice des features
+    
+    y_param : vecteur de delais de rehospit
+    
+    feature_to_test : le feature pour lequel on fait le calcul
+    
+    n : la taille de l'interval pour le calcul de la moyenne autour du multiple de 7
+    
+    lim : limite du nombre des jours
+        default 70
+    
+    Returns
+    -------
+    
+    la moyenne ponderee des rapport
+    nombre total des 
+    """
+    # Delais de rehospit pour feature_to_test
+    delays = y_param[(X_param[:,short_column_label_dict[feature_to_test]]==1).todense()]
+    
+    # Historgramme des delais allant de 0 a lim+n
+    freq = np.zeros(lim+n+1, dtype=int)
+    for i in range(0, lim+n):
+        freq[i] = np.sum(delays==i)
+    
+    # Moyenne cumulee et ponderee des rappors entre le target (delai multiple de 7) et son voisinage 
+    target_to_neighborhood = 0
+    
+    # Nombre total des cas
+    all_weights = 0
+    
+    for i in range(7,lim+1,7):
+        # Nombre des cas de ce viosinnage y compris le target (multiple de 7)
+        weight = 0
+        # Liste des frequences du voisinnage dans le target
+        neighborood_freq_list = list()
+        # La frequence du target
+        target_freq = freq[i]
+        for j in range(i-n, i+n+1):
+            weight += freq[j]
+            if j==i:
+                continue
+            neighborood_freq_list.append(freq[j])
+        # Sigma de (Target / moyenne du voisinnage) * nombre total des cas
+        target_to_neighborhood += weight *float(target_freq)/np.mean(neighborood_freq_list)
+        # Sigma de toutes les frequences
+        all_weights += weight
+        
+    return float(target_to_neighborhood)/all_weights, all_weights # Moyenne ponderee generale, Nombre total des cas
     
 # #########################################
 # Iitialisation des variables globales
@@ -1196,49 +1372,96 @@ if False:
     create_and_save_global_refs() # Creating labels
     generate_clean_files()
 
-    detect_and_save_rehosps_dict()
+    rehosps_dict = detect_and_save_rehosps_dict()
+    
     rehosps_dict = load_rehosps_dict()
-    plot_rehosps_180j_dict(rehosps_dict)
-    X, y = create_and_save_rsas_rehosps_X_y(rehosps_dict)
+    plot_rehosps_180j_dict(rehosps_dict, 0)
+    plot_rehosps_180j_dict(rehosps_dict, 1)
+    
+    X, y_sts, y_ets = create_and_save_rsas_rehosps_X_y(rehosps_dict)
 
     X = load_sparse(X_rehosps_sparse_file_path)
-    y = np.load(y_rehosps_path)['y']
-    y_x7 = convert_to_is_multipe_of_7(y)
-
-
-    learn_tree(X, y_x7)
-
-    lr = LogisticRegression(verbose=1)
-    lr.fit(X, y_x7)
-    print 'coeffs : ', lr.coef_
-    print 'score', lr.score(X, y_x7)
-    y_p = lr.predict(X)
-    float(np.sum(y_p))/len(y_p)
-    float(np.sum(y_x7))/len(y_x7)
-
-
+    y_sts = np.load(y_rehosps_path)['y_sts']
+    y_ets = np.load(y_rehosps_path)['y_ets']
     
-    (X[:,4]==1).todense()
-    X_lil = X.tolil()
-    X_lil[:,3]=0
-    X_3 = X_lil.tocsr()
+    plot_rehosps_180j_array(y_sts)
+    plot_rehosps_180j_array(y_ets)
 
-    rfe = feature_select_rfe_logistic_regression(X, y, 1)
-    save_rfe()
+    feature_to_test_list = ['type_um_36']
+    plot_y_rehosps(X, y_sts, feature_to_test_list)
+    
+    calcul_mean_diff(X, y_sts,'type_um_36')
+
+    y_sts_dummy_7 = convert_to_is_multipe_of_7(y_sts)
+    y_ets_dummy_7 = convert_to_is_multipe_of_7(y_ets)
+
+    # Learning by tree algorithm
+    learn_tree(X, y_sts_dummy_7, min_depth = 3, max_depth = 3)
+    learn_tree(X, y_ets_dummy_7, min_depth = 3, max_depth = 3)
+
+    # Learning by LR algorithm
+    lr = learn_lr(X, y_sts_dummy_7)
+    print 'Score for LR STS : ', lr.score(X, y_sts_dummy_7)
+    y_p = lr.predict(X)
+    print 'Proportion of ones in predicted Y' , float(np.sum(y_p))/len(y_p)
+    print 'Proportion of ones in Y STS' , float(np.sum(y_sts_dummy_7))/len(y_sts_dummy_7)
+
+    # RFE
+    rfe = feature_select_rfe_logistic_regression(X, y_sts_dummy_7, 1)
+    save_rfe(rfe)
+    
+    #Loading RFE
     rfe = load_rfe()
     ranked_labels_list = print_and_get_ranked_labels_by_RFE(rfe)
-    df = print_mean_comparison_stats(X, y_x7, ranked_labels_list)
-    sorted_df = df.sort(['rfe_rank'])
+    df = get_mean_comparison_stats_as_df(X, y_sts_dummy_7, ranked_labels_list)
+    sorted_df = df.sort(['rfe_rank'], ascending=True)
     
     chi2, pval_chi2 = chi2(X,y)
     f_c, pval_f = f_classif(X,y)
      
     lr = LogisticRegression()
-    lr.fit(X,y)
+    lr.fit(X,y_x7)
     y_p = lr.predict(X)
     
     np.sum(y_p)
     np.sum(y)
     np.sum(y_p == np.array(y).T)
 
+    y = np.reshape(y, (len(y),1))
+    delays_avec = y[(X[:,short_column_label_dict[feature_to_test]]==1).todense()]
+    delays_sans = y[(X[:,short_column_label_dict[feature_to_test]]==0).todense()]
+
     
+    feature_to_test = 'complexity_ghm_J'
+    
+    features = list()
+    response = list()
+    for feature in short_column_label_dict:
+        if (feature=='age') or (feature=='stay_length'):
+            continue
+        print feature
+        m, n = calcul_mean_diff(X, y, feature, 3)
+        response.append([n, np.mean(m)])
+        features.append(feature)
+    df = pd.DataFrame(response, index=features, columns=['n', 'r'])
+    sorted_df = df.sort(['r'], ascending=False)
+
+    from sklearn.decomposition import PCA
+    from sklearn import preprocessing
+    pca_1 = PCA(n_components=5)
+    pca_0 = PCA(n_components=5)
+    
+    X_1 = X[y_x7==1,:]
+    X_1_cols_not_0 = np.sum(X_1.toarray(), axis=0)!=0
+    X_1_1 = preprocessing.normalize(X_1[:,X_1_cols_not_0])
+    
+    X_0 = X[y_x7==0,:]
+    X_0_cols_not_0 = np.sum(X_0.toarray(), axis=0)!=0
+    X_0_1 = preprocessing.normalize(X_0[:,X_0_cols_not_0])
+    
+    pca_1 = pca_1.fit(X_1_1.todense())
+    pca_0 = pca_0.fit(X_0_1.todense())
+    pca_1.components_
+    pca_0.components_ 
+    pca_1.explained_variance_ratio_
+    pca_0.explained_variance_ratio_ 
