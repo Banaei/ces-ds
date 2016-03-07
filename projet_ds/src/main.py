@@ -207,6 +207,7 @@ def init_globals():
         short_column_labels_indexes_dict[index] = key
     for i in range(len(short_column_labels_indexes_dict)):
         short_column_label_list.append(short_column_labels_indexes_dict[i])
+    short_column_label_list.sort()
 
     
 def save_sparse(filename, array):
@@ -480,22 +481,27 @@ def get_rsa_data(rsa, rsa_format, verbose=None):
 
     # Un sejour peut etre considere urgence soit si le mode d'entree est 5 et la provenance 8, soit si l'unite medicale
     # fait partie de la liste des unites medicales urgences
-    urgence = 0    
+    urgence = 0
+    first_um_uhcd = False    
     type_um_dict = {}
+    first_um = True
     for i in range(0, nb_rum):
         type_um = rsa[first_um_sp: first_um_sp + type_um_length].strip()
+        if (first_um):
+            if (type_um in codes_um_urgences_dict):
+                first_um_uhcd = True
+            first_um = False
         if (not check_code(type_um, type_um=True)):
             if verbose:
                 print 'Error in TYPE UM %s, TUPE UM skipped' % (type_um)
 #            error = True
         else:
             type_um_dict[type_um] = 1
-            if (type_um in codes_um_urgences_dict):
-                urgence = 1
+            
         first_um_sp += rum_length
 
     mode_entree_provenance = rsa[rsa_format['mode_entree_provenance_sp'] - 1:rsa_format['mode_entree_provenance_ep']].strip()
-    if (mode_entree_provenance == '58'):
+    if (first_um_uhcd and mode_entree_provenance == '85'):
         urgence = 1
 
         
@@ -729,12 +735,19 @@ def plot_rehosps_180j_dict(rehosps_dict, type_delai):
     ----------
     rehosps_dict : Dict des rehosps de format {numero de ligne dans le fichier RSA : delai de rehospitalisation}
     
-    type_delai : 0 pour start to start, 1 pour end to start
+    type_delai : sts, ets
     """
+    
+    if type_delai==sts:
+        td = 0
+    elif type_delai==sts:
+        td=1
+    else:
+        raise Exception('Erreur dans le type_delai : ' + type_delai)
     gaps = np.zeros((len(rehosps_dict),1))
     i=0
     for l in rehosps_dict:
-        gaps[i]=rehosps_dict[l][type_delai]
+        gaps[i]=rehosps_dict[l][td]
         i+=1
        
     freq = np.zeros(182, dtype=int)
@@ -753,7 +766,7 @@ def plot_rehosps_180j_dict(rehosps_dict, type_delai):
     plt.plot(X,freq[X], 'b-', label='Tout')
     plt.plot(X_max, freq[Y_index_max],'ro', label='delai = 7, 14, 21, ... jours')
     plt.plot(X_no_max, freq[Y_index_no_max],'r.', label='delai non multiple de 7')
-    if type_delai==0:
+    if type_delai=='sts':
         title = 'Delais de rehospitalisation (debut au debut) en 2013'
     else:
         title = 'Delais de rehospitalisation (fin au debut) en 2013'
@@ -902,6 +915,7 @@ def rsa_to_X_short(rsa_data_dict, X, i):
     X[i, short_column_label_dict['emergency']]=rsa_info_dict['emergency']
     X[i, short_column_label_dict['private']]=rsa_info_dict['private']
     X[i, short_column_label_dict['dpt_' + rsa_info_dict['dpt']]]=1
+    X[i, short_column_label_dict['cmd_' + rsa_info_dict['cmd']]]=1
     X[i, short_column_label_dict['type_ghm_' + rsa_info_dict['type_ghm']]]=1
     X[i, short_column_label_dict['complexity_ghm_' + rsa_info_dict['complexity_ghm']]]=1
     for t_u in rsa_info_dict['type_um']:
@@ -1187,6 +1201,64 @@ def get_mean_comparison_stats_as_df(X, y, ranked_labels_list):
     return df
 
 
+def get_features_count(X, cld=short_column_label_dict):
+    """
+    Calcule pour chaque feature le nombre de cas ou il est a 1
+    
+    Parameters
+    ----------
+    
+    X : La matrice des donnees avec les sejours en lignes et les features en colonnes
+    
+    cld : column labels dict
+        default : short_column_label_dict
+        
+    Returns
+    -------
+    
+    DataFrame avec les features en index et la somme en colonne
+    """
+    s = np.sum(X.todense(), axis=0)
+    df = pd.DataFrame(index=cld, columns=['s'])
+    for feature in short_column_label_dict:
+        df.set_value(feature, 's', s[0, short_column_label_dict[feature]])
+    print 'Les features a zero :'
+    print df[df.s==0]
+    return df
+    
+def get_features_bump_scores_as_df(X_param, y_param, cll=short_column_label_list):
+    """
+    Calcule le score de protuberance (bump) à des points multiples de 7
+    
+    Parameters
+    ----------
+    
+    X_param : Data
+    
+    y_param : delais de rehospit
+    
+    cll : column label list
+        default : short_column_label_list
+        
+    Returns
+    -------
+    
+    DataFrame (index=cll, columns=['bump', 'count', 'score']) avec bump=le score de protuberance, count=nombre des cas, score=bump*count
+    
+    """
+    df = pd.DataFrame(index=cll, columns=['bump', 'count', 'score'])
+    for feature in cll:
+        print '\rProcessing ', feature,
+        bump, count = calcul_mean_diff(X_param, y_param, feature)
+        df.set_value(feature,'bump', bump)
+        df.set_value(feature,'count', count)
+        df.set_value(feature,'score', bump*count)
+    df.sort(['score'], ascending=False)
+    return df
+
+    
+
+
 def learn_tree(X_data, Y_data, min_depth = 1, max_depth = 3, dtc_fp=dtc_file_path, dot_fp = tree_dot_file_path, pdf_fp=tree_pdf_file_path):
     """
     Classification par arbre
@@ -1253,9 +1325,9 @@ def plot_y_rehosps(X_param, y_param, feature_to_test_list):
     feature_to_test_list : les features a tester. Deux courbes seront tracees une avec au moins l'un de ces features =0 et l'autre avec aucun = 1
     
     """
-    indexes_avec = numpy.zeros(y_param.shape, dtype=bool)
+    indexes_avec = np.ones(y_param.shape, dtype=bool)
     for feature_to_test in feature_to_test_list:
-        indexes_avec = indexes_avec + (X_param[:,short_column_label_dict[feature_to_test]]==1).todense()
+        indexes_avec = np.logical_and(indexes_avec, (X_param[:,short_column_label_dict[feature_to_test]]==1).todense())
     indexes_sans = np.invert(indexes_avec)
         
         
@@ -1297,7 +1369,7 @@ def plot_y_rehosps(X_param, y_param, feature_to_test_list):
     plt.show()   
 
 
-def calcul_mean_diff(X_param, y_param, feature_to_test, n=2, lim=70):
+def calcul_mean_diff(X_param, y_param, feature_to_test, n=3, lim=70):
     """
     Calcule la difference moyenne ponderee entre les delais multiples de 7 et leurs voisins de -n a +n.
     Exemple, il calcule le rapport entre le nombre de rehospits a 7j et la moyenne des nombres des rehospits
@@ -1321,8 +1393,7 @@ def calcul_mean_diff(X_param, y_param, feature_to_test, n=2, lim=70):
     Returns
     -------
     
-    la moyenne ponderee des rapport
-    nombre total des 
+    la moyenne ponderee des rapport,  nombre total des cas
     """
     # Delais de rehospit pour feature_to_test
     delays = y_param[(X_param[:,short_column_label_dict[feature_to_test]]==1).todense()]
@@ -1351,14 +1422,22 @@ def calcul_mean_diff(X_param, y_param, feature_to_test, n=2, lim=70):
                 continue
             neighborood_freq_list.append(freq[j])
         # Sigma de (Target / moyenne du voisinnage) * nombre total des cas
-        target_to_neighborhood += weight *float(target_freq)/np.mean(neighborood_freq_list)
+        denom = np.mean(neighborood_freq_list)
+        if denom!=0:
+            target_to_neighborhood += weight *float(target_freq)/denom
         # Sigma de toutes les frequences
         all_weights += weight
-        
-    return float(target_to_neighborhood)/all_weights, all_weights # Moyenne ponderee generale, Nombre total des cas
+    if all_weights==0:
+        response = 0
+    else:
+        response = float(target_to_neighborhood)/all_weights
+    return response, all_weights # Moyenne ponderee generale, Nombre total des cas
     
 # #########################################
 # Iitialisation des variables globales
+
+
+
 
 def convert_to_is_multipe_of_7(y):
     return np.ravel( [(lambda x:1*(x>0)*((x%7)==0))(x) for x in y])
@@ -1369,28 +1448,71 @@ init_globals()
 #  Test area
     
 if False:
-    create_and_save_global_refs() # Creating labels
+    # Creation et sauvegarde des referentiels
+    create_and_save_global_refs() 
+    
+    # Generation de fichiers ANO et RSA propres sans erreurs (CMD90 et CMD28)
     generate_clean_files()
 
+    #Detection et sauveagrde des rehospitalisations
     rehosps_dict = detect_and_save_rehosps_dict()
     
+    # Chargement du dict des rehospits
     rehosps_dict = load_rehosps_dict()
-    plot_rehosps_180j_dict(rehosps_dict, 0)
-    plot_rehosps_180j_dict(rehosps_dict, 1)
     
+    # Graphique des delais pour start to start
+    plot_rehosps_180j_dict(rehosps_dict, 'sts')
+    # Graphique des delais pour end to start
+    plot_rehosps_180j_dict(rehosps_dict, 'ets')
+    
+    # Creation et sauvegarde de la matrice eparse X (data x features), et des 
+    # labels y_sts et y_ets representant les delais de rehospit
     X, y_sts, y_ets = create_and_save_rsas_rehosps_X_y(rehosps_dict)
+    
+    # DataFrame du nombre total de chaque feature (affichage des features absents)
+    features_count_df = get_features_count(X)
+    
+    # Calcul du bump score
+    bump_score_df = get_features_bump_scores_as_df(X,y_sts)
+    bump_score_df.sort(['bump'], ascending=False)
 
+    # Chrgement de la matrice eparse de data et des labels
     X = load_sparse(X_rehosps_sparse_file_path)
     y_sts = np.load(y_rehosps_path)['y_sts']
     y_ets = np.load(y_rehosps_path)['y_ets']
     
+    # Graphique des delais de rehospit
     plot_rehosps_180j_array(y_sts)
     plot_rehosps_180j_array(y_ets)
-
+    
+    # Dialyse peritonéale à domicile
     feature_to_test_list = ['type_um_36']
     plot_y_rehosps(X, y_sts, feature_to_test_list)
+
+    # Unite de prise en charge de la douleur chronique
+    feature_to_test_list = ['type_um_61']
+    plot_y_rehosps(X, y_sts, feature_to_test_list)
+
+    # CMD 02
+    feature_to_test_list = ['cmd_02']
+    plot_y_rehosps(X, y_sts, feature_to_test_list)
+
+    # Catarracte
+    feature_to_test_list = ['cmd_02', 'complexity_ghm_J', 'type_ghm_C']
+    plot_y_rehosps(X, y_sts, feature_to_test_list)
+
+    # PTH
+    feature_to_test_list = ['cmd_08', 'complexity_ghm_1', 'type_ghm_C']
+    plot_y_rehosps(X, y_sts, feature_to_test_list)
+    feature_to_test_list = ['cmd_08', 'complexity_ghm_2', 'type_ghm_C']
+    plot_y_rehosps(X, y_sts, feature_to_test_list)
+    feature_to_test_list = ['cmd_08', 'complexity_ghm_3', 'type_ghm_C']
+    plot_y_rehosps(X, y_sts, feature_to_test_list)
+    feature_to_test_list = ['cmd_08', 'complexity_ghm_4', 'type_ghm_C']
+    plot_y_rehosps(X, y_sts, feature_to_test_list)
+
     
-    calcul_mean_diff(X, y_sts,'type_um_36')
+    calcul_mean_diff(X, y_sts,'complexity_ghm_J')
 
     y_sts_dummy_7 = convert_to_is_multipe_of_7(y_sts)
     y_ets_dummy_7 = convert_to_is_multipe_of_7(y_ets)
