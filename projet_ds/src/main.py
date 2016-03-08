@@ -745,9 +745,9 @@ def plot_rehosps_180j_dict(rehosps_dict, type_delai):
     type_delai : sts, ets
     """
     
-    if type_delai==sts:
+    if type_delai=='sts':
         td = 0
-    elif type_delai==sts:
+    elif type_delai=='ets':
         td=1
     else:
         raise Exception('Erreur dans le type_delai : ' + type_delai)
