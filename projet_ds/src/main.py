@@ -114,7 +114,8 @@ def create_and_save_global_refs():
     for i in range(5,66,5):
         full_column_label_dict['stay_length_' + str(i)] = 0
     full_column_label_dict['sex'] = 0
-    full_column_label_dict['emergency'] = 0
+    full_column_label_dict['this_emergency'] = 0
+    full_column_label_dict['next_emergency'] = 0
     full_column_label_dict['private'] = 0
     add_column_labels_from_file_to_dict(codes_cmd_file_path, full_column_label_dict, 'cmd_')
     add_column_labels_from_file_to_dict(codes_departement_file_path, full_column_label_dict, 'dpt_')
@@ -136,7 +137,8 @@ def create_and_save_global_refs():
     for i in range(5,66,5):
         short_column_label_dict['stay_length_' + str(i)] = 0
     short_column_label_dict['sex'] = 0
-    short_column_label_dict['emergency'] = 0
+    short_column_label_dict['this_emergency'] = 0
+    short_column_label_dict['next_emergency'] = 0
     short_column_label_dict['private'] = 0
     add_column_labels_from_file_to_dict(codes_cmd_file_path, short_column_label_dict, 'cmd_')
     add_column_labels_from_file_to_dict(codes_departement_file_path, short_column_label_dict, 'dpt_')
@@ -869,7 +871,7 @@ def load_rehosps_as_dict_check_x7j(in_file=rehosps_x7j_dict_file_pah):
         return pickle.load(f)
    
 
-def rsa_to_X_short(rsa_data_dict, X, i):
+def rsa_to_X_short(rsa_data_dict, next_emergency, X, i):
     """
     Trasforme les informations contenues dans le dict rsa_dict en une ligne (la ligne i) de la matrice X. La colonne
     ou sera placee chaque information est celle donnee par short_column_label_dict
@@ -878,6 +880,8 @@ def rsa_to_X_short(rsa_data_dict, X, i):
     ----------
     
     rsa_dict : le dict contenant les informations du RSA
+    
+    next_emergency : 0 ou 1, indique si le sejour suivant est urgences ou non
         
     X : La matrice ou il faut ecrire les informations (une ligne)
         
@@ -917,7 +921,8 @@ def rsa_to_X_short(rsa_data_dict, X, i):
         else:
             X[i, short_column_label_dict['stay_length_'+str(((stay_length/5)+1)*5)]] = 1
     X[i, short_column_label_dict['sex']]=rsa_info_dict['sex']
-    X[i, short_column_label_dict['emergency']]=rsa_info_dict['emergency']
+    X[i, short_column_label_dict['this_emergency']]=rsa_info_dict['emergency']
+    X[i, short_column_label_dict['next_emergency']]=rsa_info_dict['next_emergency']
     X[i, short_column_label_dict['private']]=rsa_info_dict['private']
     X[i, short_column_label_dict['dpt_' + rsa_info_dict['dpt']]]=1
     X[i, short_column_label_dict['cmd_' + rsa_info_dict['cmd']]]=1
@@ -967,9 +972,10 @@ def create_and_save_rsas_rehosps_X_y(rehosps_dict, rsas_file_path=rsa_clean_file
             rsa_line = rsa_file.readline().strip()
             if (line_number in rehosps_dict):
                 rsa_data_dict = get_rsa_data(rsa_line, rsa_format)
-                rsa_to_X_short(rsa_data_dict, sparse_X, i)
                 y_sts[i] = rehosps_dict[line_number][0]
                 y_ets[i] = rehosps_dict[line_number][1]
+                next_emergency = rehosps_dict[line_number][2]
+                rsa_to_X_short(rsa_data_dict, next_emergency, sparse_X, i)
                 i += 1
             line_number += 1
             if line_number % 10000 == 0:
