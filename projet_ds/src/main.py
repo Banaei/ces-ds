@@ -922,7 +922,7 @@ def rsa_to_X_short(rsa_data_dict, next_emergency, X, i):
             X[i, short_column_label_dict['stay_length_'+str(((stay_length/5)+1)*5)]] = 1
     X[i, short_column_label_dict['sex']]=rsa_info_dict['sex']
     X[i, short_column_label_dict['this_emergency']]=rsa_info_dict['emergency']
-    X[i, short_column_label_dict['next_emergency']]=rsa_info_dict['next_emergency']
+    X[i, short_column_label_dict['next_emergency']]=next_emergency
     X[i, short_column_label_dict['private']]=rsa_info_dict['private']
     X[i, short_column_label_dict['dpt_' + rsa_info_dict['dpt']]]=1
     X[i, short_column_label_dict['cmd_' + rsa_info_dict['cmd']]]=1
