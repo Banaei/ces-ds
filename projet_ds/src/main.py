@@ -386,7 +386,7 @@ def get_rsa_data(rsa, rsa_format, verbose=None):
                 'private': prive
                 'dp': diagnostic principal
                 'dr': diagnostic relie
-                'urgence': admis dans le cadre d'urgence 0/1
+                'emergency': admis dans le cadre d'urgence 0/1
                 'age': age
                 'stay_length': duree du sejour
                 'type_ghm': type du groupe homogene de malade (GHM),
@@ -1461,6 +1461,14 @@ init_globals()
 if False:
     # Creation et sauvegarde des referentiels
     create_and_save_global_refs() 
+    
+    # Globals
+    full_column_label_dict
+    short_column_label_dict
+    codes_um_urgences_dict
+    ipe_prive_dict
+    short_column_label_list
+
     
     # Generation de fichiers ANO et RSA propres sans erreurs (CMD90 et CMD28)
     generate_clean_files()
