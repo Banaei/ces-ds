@@ -606,9 +606,10 @@ def generate_clean_files(ano_in_file_path=ano_file_path_2013, rsa_in_file_path=r
 
 def detect_and_save_rehosps_dict(delai_rehosp=180, ano_file_path=ano_clean_file_path_2013, ano_format=ano_2013_format, rsa_file_path=rsa_clean_file_path_2013, rsa_format=rsa_2013_format, rehosps_file_path=rehosps_180_delay_dict_file_path):
     """
-    Detecte les cas de re-hospitalisation parmi les sejours et enregistre un dict {line_number:[[delay_start_to_start, delay_end_to_start]]}.
+    Detecte les cas de re-hospitalisation parmi les sejours et enregistre un dict {line_number:[[delay_start_to_start, delay_end_to_start, next_is_urgence]]}.
     Le delai debut au debut est le delai en jous qui separe le debut d'un sejour du debut du sejour suivant. Le delai fin au debut est le nombre
     de jours qui separe la fin deun sejour du debt du suivant.
+    Seuls les delais >0 et <= delai_rehosp sont detectes
     
     Parameters
     ----------
@@ -627,7 +628,8 @@ def detect_and_save_rehosps_dict(delai_rehosp=180, ano_file_path=ano_clean_file_
     
     Retruns
     -------
-    rehosps__delay_dict : un dict de est {numero de ligne dans le fichier RSA:[delai debut au debut, delai fin au début]}
+    rehosps__delay_dict : un dict {numero de ligne dans le fichier RSA:[delai debut au debut, delai fin au début, next_is_urgence]}
+        Le troisieme element indique si la rehospit qui suit est une urgence ou non.
         le delai est egal au nombre de jours entre la fin du sejour et le debut du sejour suivant (pour le meme patient bien entendu).
         ce rehosps__delay_dict est aussi enregistree dans le fichier rehosps_file_path donne en parametre
         Ce dict est egalement enregistree sous rehosps_file_path
@@ -643,10 +645,12 @@ def detect_and_save_rehosps_dict(delai_rehosp=180, ano_file_path=ano_clean_file_
                 if (len(ano_line.strip())>0):
                     ano_hash = ano_line[ano_format['ano_sp'] - 1:ano_format['ano_ep']]
                     sej_num = int(ano_line[ano_format['sej_num_sp'] - 1:ano_format['sej_num_ep']])
-                    stay_length = int(rsa_line[rsa_format['stay_length_sp'] - 1:rsa_format['stay_length_ep']].strip()) 
+                    error, rsa_data = get_rsa_data(rsa_line, rsa_format)
+                    stay_length = rsa_data['stay_length'] 
+                    urgence = rsa_data['urgence']
                     if (ano_hash not in result_dict):
                         result_dict[ano_hash]=list()
-                    result_dict[ano_hash].append({'sej_num':sej_num, 'stay_length':stay_length, 'line_number':line_number})
+                    result_dict[ano_hash].append({'sej_num':sej_num, 'stay_length':stay_length, 'urgence':urgence, 'line_number':line_number})
                 if not ano_line:
                     break
                 if line_number % 100000 == 0:
@@ -674,13 +678,14 @@ def detect_and_save_rehosps_dict(delai_rehosp=180, ano_file_path=ano_clean_file_
                     continue
                 else:
                     current_sej_num = element['sej_num']
+                    urgence = element['urgence']
                     delay_start_to_start = current_sej_num - last_sej_num
                     delay_end_to_start = current_sej_num - (last_sej_num + last_stay_length)
                     if (delay_start_to_start<0):
                         error_number += 1
                         break
                     if (delay_start_to_start>0 and delay_start_to_start <= delai_rehosp) or (delay_end_to_start>0 and delay_end_to_start <= delai_rehosp):
-                        rehosps_delay_dict[last_line_number] = [delay_start_to_start, delay_end_to_start]
+                        rehosps_delay_dict[last_line_number] = [delay_start_to_start, delay_end_to_start, urgence]
                     last_sej_num = current_sej_num
                     last_stay_length = element['stay_length']
                     last_line_number = element['line_number']
