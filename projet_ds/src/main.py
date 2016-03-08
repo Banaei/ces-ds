@@ -686,7 +686,7 @@ def detect_and_save_rehosps_dict(delai_rehosp=180, ano_file_path=ano_clean_file_
                     if (delay_start_to_start<0):
                         error_number += 1
                         break
-                    if (delay_start_to_start>0 and delay_start_to_start <= delai_rehosp) or (delay_end_to_start>0 and delay_end_to_start <= delai_rehosp):
+                    if delay_start_to_start>0 and delay_end_to_start>0 and (delay_start_to_start <= delai_rehosp or delay_end_to_start <= delai_rehosp):
                         rehosps_delay_dict[last_line_number] = [delay_start_to_start, delay_end_to_start, urgence]
                     last_sej_num = current_sej_num
                     last_stay_length = element['stay_length']
@@ -1504,6 +1504,11 @@ if False:
     plot_rehosps_180j_array(y_sts)
     plot_rehosps_180j_array(y_ets)
     
+    # Les sejours suivis pas une hospitalisation en urgence
+    feature_to_test_list = ['next_emergency']
+    plot_y_rehosps(X, y_sts, feature_to_test_list)
+    plot_y_rehosps(X, y_ets, feature_to_test_list)
+
     # Dialyse peritonéale à domicile
     feature_to_test_list = ['type_um_36']
     plot_y_rehosps(X, y_sts, feature_to_test_list)
