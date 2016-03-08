@@ -679,7 +679,7 @@ def detect_and_save_rehosps_dict(delai_rehosp=180, ano_file_path=ano_clean_file_
                     if (delay_start_to_start<0):
                         error_number += 1
                         break
-                    if (delay_start_to_start <= delai_rehosp) or (delay_end_to_start <= delai_rehosp):
+                    if (delay_start_to_start>0 and delay_start_to_start <= delai_rehosp) or (delay_end_to_start>0 and delay_end_to_start <= delai_rehosp):
                         rehosps_delay_dict[last_line_number] = [delay_start_to_start, delay_end_to_start]
                     last_sej_num = current_sej_num
                     last_stay_length = element['stay_length']
