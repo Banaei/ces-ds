@@ -649,7 +649,7 @@ def detect_and_save_rehosps_dict(delai_rehosp=180, ano_file_path=ano_clean_file_
                     sej_num = int(ano_line[ano_format['sej_num_sp'] - 1:ano_format['sej_num_ep']])
                     error, rsa_data = get_rsa_data(rsa_line, rsa_format)
                     stay_length = rsa_data['stay_length'] 
-                    urgence = rsa_data['urgence']
+                    urgence = rsa_data['emergency']
                     if (ano_hash not in result_dict):
                         result_dict[ano_hash]=list()
                     result_dict[ano_hash].append({'sej_num':sej_num, 'stay_length':stay_length, 'urgence':urgence, 'line_number':line_number})
