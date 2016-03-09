@@ -552,6 +552,29 @@ def get_rsa_data(rsa, rsa_format, verbose=None):
      }
     
 
+def count_lines_of_the_file(file_path):
+    """
+    Compte le nombre de ligne du fichier fourni en parametre
+    
+    Parametres
+    ----------
+    
+    file_path : le path du fichier
+    
+    Returns
+    -------
+    
+    le nombre de ligne
+    """
+    line_number = 0
+    with open(file_path) as f:
+        while True:
+           l = f.readline()
+           line_number += 1
+           if not l:
+               break
+    return line_number
+
 def generate_clean_files(ano_in_file_path=ano_file_path_2013, rsa_in_file_path=rsa_file_path_2013, ano_out_file_path=ano_clean_file_path_2013, rsa_out_file_path=rsa_clean_file_path_2013, ano_format=ano_2013_format, rsa_format=rsa_2013_format):
     """
     Parcourt les fichiers ANO et RSA, supprime toutes les lignes correspondant aux RSA et ANO en erreur et ecrit les 
@@ -773,6 +796,49 @@ def plot_rehosps_180j_dict(rehosps_dict, type_delai):
     plt.plot(X,freq[X], 'b-', label='Tout')
     plt.plot(X_max, freq[Y_index_max],'ro', label='delai = 7, 14, 21, ... jours')
     plt.plot(X_no_max, freq[Y_index_no_max],'r.', label='delai non multiple de 7')
+    if type_delai=='sts':
+        title = 'Delais de rehospitalisation (debut au debut) en 2013'
+    else:
+        title = 'Delais de rehospitalisation (fin au debut) en 2013'
+    plt.title(title)
+    plt.xlabel('Delai entre deux hospitalisation en jours')
+    plt.ylabel('Nombre de sejours')
+    plt.legend(loc="best")
+    plt.show()   
+
+def plot_rehosps_180j_dict_brut(rehosps_dict, type_delai):
+    """
+    Trace la courbe de la repartition des delais de re-hospitalisation.
+    En X : le delai
+    En Y : le nombre de rehops
+    
+    Parameters
+    ----------
+    rehosps_dict : Dict des rehosps de format {numero de ligne dans le fichier RSA : delai de rehospitalisation}
+    
+    type_delai : sts, ets
+    """
+    
+    if type_delai=='sts':
+        td = 0
+    elif type_delai=='ets':
+        td=1
+    else:
+        raise Exception('Erreur dans le type_delai : ' + type_delai)
+    gaps = np.zeros((len(rehosps_dict),1))
+    i=0
+    for l in rehosps_dict:
+        gaps[i]=rehosps_dict[l][td]
+        i+=1
+       
+    freq = np.zeros(182, dtype=int)
+    for i in range(0, 182):
+        freq[i] = np.sum(gaps==i)
+    
+    
+    X = np.asarray(range(0,180))
+    
+    plt.plot(X,freq[X], 'b-', label='Tout')
     if type_delai=='sts':
         title = 'Delais de rehospitalisation (debut au debut) en 2013'
     else:
@@ -1308,7 +1374,11 @@ def learn_tree(X_data, Y_data, min_depth = 1, max_depth = 3, dtc_fp=dtc_file_pat
     with open(dtc_fp, 'w') as f:
         pickle.dump(dtc, f)
 
-    f = tree.export_graphviz(dtc, out_file=dot_fp, feature_names=short_column_label_list) # clf: tree classifier
+    col_names = ['']*len(short_column_label_dict)
+    for key in short_column_label_dict:
+        col_names[short_column_label_dict[key]]=key
+
+    f = tree.export_graphviz(dtc, out_file=dot_fp, feature_names=col_names) # clf: tree classifier
     os.system("dot -Tpdf " + dot_fp + " -o " + pdf_fp)
     return dtc
 
@@ -1493,7 +1563,7 @@ if False:
     
     # Calcul du bump score
     bump_score_df = get_features_bump_scores_as_df(X,y_sts)
-    bump_score_df.sort(['bump'], ascending=False)
+    bump_score_df_sorted = bump_score_df.sort(['bump'], ascending=False)
 
     # Chrgement de la matrice eparse de data et des labels
     X = load_sparse(X_rehosps_sparse_file_path)
@@ -1533,6 +1603,10 @@ if False:
     feature_to_test_list = ['cmd_08', 'complexity_ghm_3', 'type_ghm_C']
     plot_y_rehosps(X, y_sts, feature_to_test_list)
     feature_to_test_list = ['cmd_08', 'complexity_ghm_4', 'type_ghm_C']
+    plot_y_rehosps(X, y_sts, feature_to_test_list)
+
+    # departement 44
+    feature_to_test_list = ['dpt_44']
     plot_y_rehosps(X, y_sts, feature_to_test_list)
 
     
