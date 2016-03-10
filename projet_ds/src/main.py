@@ -1553,10 +1553,16 @@ if False:
     plot_rehosps_180j_dict(rehosps_dict, 'sts')
     # Graphique des delais pour end to start
     plot_rehosps_180j_dict(rehosps_dict, 'ets')
+    plot_rehosps_180j_dict_brut(rehosps_dict, 'ets')
     
     # Creation et sauvegarde de la matrice eparse X (data x features), et des 
     # labels y_sts et y_ets representant les delais de rehospit
     X, y_sts, y_ets = create_and_save_rsas_rehosps_X_y(rehosps_dict)
+    
+    # Chrgement de la matrice eparse de data et des labels
+    X = load_sparse(X_rehosps_sparse_file_path)
+    y_sts = np.load(y_rehosps_path)['y_sts']
+    y_ets = np.load(y_rehosps_path)['y_ets']
     
     # DataFrame du nombre total de chaque feature (affichage des features absents)
     features_count_df = get_features_count(X)
@@ -1565,11 +1571,6 @@ if False:
     bump_score_df = get_features_bump_scores_as_df(X,y_sts)
     bump_score_df_sorted = bump_score_df.sort(['bump'], ascending=False)
 
-    # Chrgement de la matrice eparse de data et des labels
-    X = load_sparse(X_rehosps_sparse_file_path)
-    y_sts = np.load(y_rehosps_path)['y_sts']
-    y_ets = np.load(y_rehosps_path)['y_ets']
-    
     # Graphique des delais de rehospit
     plot_rehosps_180j_array(y_sts)
     plot_rehosps_180j_array(y_ets)
