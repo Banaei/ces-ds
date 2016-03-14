@@ -21,7 +21,7 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn import tree
 import os
 from sklearn.linear_model import LogisticRegression
-
+from sklearn import metrics
 from sklearn.feature_selection import chi2, f_classif
 
 imp.reload(file_paths)
@@ -1053,6 +1053,47 @@ def create_and_save_rsas_rehosps_X_y(rehosps_dict, rsas_file_path=rsa_clean_file
     save_sparse(X_out_file_path, X)
     np.savez_compressed(y_out_file_path, y_sts=y_sts, y_ets=y_ets)
     return X, y_sts, y_ets    
+
+
+def save_age_stay_length(rehosps_dict, rsas_file_path=rsa_clean_file_path_2013, rsa_format=rsa_2013_format, out_file_path=age_satay_length_file_path):
+    '''
+    This method parses the lines of the file rsas_file_path and takes only those whose line_number (starting from 1) are 
+    included in rehosps_dict, i. e. the RSAs with rehosp. It sves the age and the stay_length of each line as csv age;stay_length
+    in the out_file_path
+    
+    Parameters
+    ----------
+    reshosps_dict : {line_number:rehosp_delay}
+    
+    rsas_file_path : RSA file
+        default : rsa_clean_file_path_2013
+    rsa_format : RSA format
+        default : rsa_2013_format
+    out_file_path : fichier de sauvegarde CSV
+        default : age_satay_length_file_path
+    '''
+    global short_column_label_dict
+    rows_count = len(rehosps_dict)
+    line_number = 1
+    i = 0
+    with open(out_file_path, 'w') as out_file:
+        with open(rsas_file_path) as rsa_file:
+            while True:
+                rsa_line = rsa_file.readline().strip()
+                if (line_number in rehosps_dict):
+                    error, rsa_data_dict = get_rsa_data(rsa_line, rsa_format)
+                    age = rsa_data_dict['age']
+                    stay_length = rsa_data_dict['stay_length']
+                    out_file.write('%s;%s\n'%(age, stay_length))
+                    i += 1
+                line_number += 1
+                if line_number % 10000 == 0:
+                    print '\rLines processed ', line_number, ', % processed ', (i*100/rows_count),
+                if (not rsa_line):
+                    break
+
+
+
     
 def feature_select_rfe_logistic_regression(X, y, n, v=1):
     """
@@ -1323,20 +1364,24 @@ def get_features_bump_scores_as_df(X_param, y_param, cll=short_column_label_list
     DataFrame (index=cll, columns=['bump', 'count', 'score']) avec bump=le score de protuberance, count=nombre des cas, score=bump*count
     
     """
-    df = pd.DataFrame(index=cll, columns=['bump', 'count', 'score'])
+    df = pd.DataFrame(index=cll, columns=['bump_score', 'count', 'bump*count'])
+    bump, count = calcul_bump_score(X_param, y_param, None)
+    df.set_value('all','bump_score', bump)
+    df.set_value('all','count', count)
+    df.set_value('all','bump*count', bump*count)
     for feature in cll:
         print '\rProcessing ', feature,
-        bump, count = calcul_mean_diff(X_param, y_param, feature)
-        df.set_value(feature,'bump', bump)
+        bump, count = calcul_bump_score(X_param, y_param, feature)
+        df.set_value(feature,'bump_score', bump)
         df.set_value(feature,'count', count)
-        df.set_value(feature,'score', bump*count)
-    df.sort(['score'], ascending=False)
+        df.set_value(feature,'bump*count', bump*count)
+    df.sort(['bump*count'], ascending=False)
     return df
 
     
 
 
-def learn_tree(X_data, Y_data, min_depth = 1, max_depth = 3, dtc_fp=dtc_file_path, dot_fp = tree_dot_file_path, pdf_fp=tree_pdf_file_path):
+def learn_tree(X_data, Y_data, criterion='gini', min_depth = 1, max_depth = 3, dtc_fp=dtc_file_path, dot_fp = tree_dot_file_path, pdf_fp=tree_pdf_file_path):
     """
     Classification par arbre
     
@@ -1357,6 +1402,10 @@ def learn_tree(X_data, Y_data, min_depth = 1, max_depth = 3, dtc_fp=dtc_file_pat
         default : tree_dot_file_path (defini dans file_paths.py)
     pdf_fp : fichier de sortie PDF de l'arbre
         default : tree_pdf_file_path (defini dans file_paths.py)
+        
+    Returns
+    -------
+    Le classifier avec le niveu max_depth
     """
     scores = list()
     print 'Total population size = ', X_data.shape[0]
@@ -1365,7 +1414,7 @@ def learn_tree(X_data, Y_data, min_depth = 1, max_depth = 3, dtc_fp=dtc_file_pat
     print 'Proportion of 1 in target=', float(np.sum(Y_data))/len(Y_data)
     print 'Beginning Desicion Tree classification'
     for depth in range(min_depth, max_depth+1):
-        dtc = DecisionTreeClassifier(criterion='gini', max_depth=depth)
+        dtc = DecisionTreeClassifier(criterion=criterion, max_depth=depth)
         dtc.fit(X_data, Y_data)
         score = dtc.score(X_data, Y_data)
         scores.append((depth, score))
@@ -1388,8 +1437,44 @@ def learn_lr(X,y):
     lr.fit(X, y)
     return lr
     
+def print_full_dataframe(df):
+    pd.set_option('display.max_rows', len(df))
+    print(df)
+    pd.reset_option('display.max_rows')
 
-def plot_y_rehosps(X_param, y_param, feature_to_test_list):
+def recursive_feature_ranking_by_bump_score(X_param, y_param):
+    
+    ranked_features_list = list()
+    bs_list = list()
+    for i in range(len(short_column_label_dict)):
+        min_bs = 1000000000
+        print str(i), '\n'
+        print ranked_features_list, '\n'
+        print bs_list, '\n'
+        selected_feature = None
+        selected_bs = 0
+        indexes_avec = np.zeros(y_param.shape, dtype=bool)
+        for ranked_feature in ranked_features_list:
+            indexes_avec = np.logical_or(indexes_avec, (X_param[:,short_column_label_dict[ranked_feature]]==1).todense())
+        for feature in short_column_label_list:
+            if feature in ranked_features_list:
+                continue
+            print '\r', feature, str(min_bs), '                                           ',
+            indexes_avec_to_test = np.logical_or(indexes_avec, (X_param[:,short_column_label_dict[feature]]==1).todense())
+            bs, count = calcul_bump_score(X_param, y_param[indexes_avec_to_test], None)
+            if (bs<min_bs):
+                selected_feature = feature
+                selected_bs = bs
+                min_bs = bs
+        ranked_features_list.append(selected_feature)
+        bs_list.append(selected_bs)
+    df = pd.DataFrame(index=ranked_features_list, columns=['bump_score'])
+    for feature, bs in zip(ranked_features_list,  bs_list):
+        df.set_value(feature, 'bump_score', bs)
+    df.to_pickle(recusrive_bump_scores_df_file_path)
+    return df
+
+def plot_y_rehosps(X_param, y_param, feature_to_test_list, logical_operation='and'):
     """
     Trace la courbe de la repartition des delais de re-hospitalisation. Il 'agit de 3 courbes :
     Une premiere avec les cas ou au moins l'un des features de la liste feature_to_test_list = 1
@@ -1404,12 +1489,22 @@ def plot_y_rehosps(X_param, y_param, feature_to_test_list):
     X_param : matrice des features
     y_param : vecteur des delais de rehosp
     feature_to_test_list : les features a tester. Deux courbes seront tracees une avec au moins l'un de ces features =0 et l'autre avec aucun = 1
-    
+    logical_operation : and ou or, indique s'il faut séparer les sejours qui ont toutes ces variables = 1 (and) ou au moins l'une (or)
+        default : 'and'
+
     """
-    indexes_avec = np.ones(y_param.shape, dtype=bool)
-    for feature_to_test in feature_to_test_list:
-        indexes_avec = np.logical_and(indexes_avec, (X_param[:,short_column_label_dict[feature_to_test]]==1).todense())
-    indexes_sans = np.invert(indexes_avec)
+    if (logical_operation=='and'):
+        indexes_avec = np.ones(y_param.shape, dtype=bool)
+        for feature_to_test in feature_to_test_list:
+            indexes_avec = np.logical_and(indexes_avec, (X_param[:,short_column_label_dict[feature_to_test]]==1).todense())
+        indexes_sans = np.invert(indexes_avec)
+    elif (logical_operation=='or'):
+        indexes_avec = np.zeros(y_param.shape, dtype=bool)
+        for feature_to_test in feature_to_test_list:
+            indexes_avec = np.logical_or(indexes_avec, (X_param[:,short_column_label_dict[feature_to_test]]==1).todense())
+        indexes_sans = np.invert(indexes_avec)
+    else:
+        raise Exception ('Error in logical operation : ', logical_operation, ' ! PErmitted values : and, or')
         
         
     delays_avec = y_param[indexes_avec]
@@ -1427,14 +1522,14 @@ def plot_y_rehosps(X_param, y_param, feature_to_test_list):
     X = np.asarray(range(0,180))
     X_max = np.asarray(range(7,180, 7))
     X_no_max = np.asarray([a for a in X if a not in X_max])
-    
+        
 #    plt.plot(X,freq[X], 'k--', label='Tout')
     plt.figure(1)
     plt.subplot(211)
     plt.plot(X,freq_avec[X], 'b-', label='Avec')
     plt.plot(X_max, freq_avec[X_max],'ro', label='delai = 7, 14, 21, ... jours')
     plt.plot(X_no_max, freq_avec[X_no_max],'r.', label='delai non multiple de 7')
-    plt.title('Delais de rehospitalisation en 2013 avec ' + str(feature_to_test_list))
+    plt.title('Delais de rehospitalisation en 2013 avec ' + str(feature_to_test_list) + ' operation logic=' + logical_operation)
     plt.xlabel('Delai entre deux hospitalisation en jours')
     plt.ylabel('Nombre de sejours')
     plt.legend(loc="best")
@@ -1450,9 +1545,9 @@ def plot_y_rehosps(X_param, y_param, feature_to_test_list):
     plt.show()   
 
 
-def calcul_mean_diff(X_param, y_param, feature_to_test, n=3, lim=70):
+def calcul_bump_score(X_param, y_param, feature_to_test, n=3, lim=70):
     """
-    Calcule la difference moyenne ponderee entre les delais multiples de 7 et leurs voisins de -n a +n.
+    Calcule le rapport moyen pondere entre les delais multiples de 7 et leurs voisins de -n a +n.
     Exemple, il calcule le rapport entre le nombre de rehospits a 7j et la moyenne des nombres des rehospits
     a 5, 6, 8 et 9 jours si n=2. il calcul ce rapport pour tous les multiples de 7 jusque lim et retorune la 
     moyenne ponderee de ces rapports
@@ -1476,8 +1571,11 @@ def calcul_mean_diff(X_param, y_param, feature_to_test, n=3, lim=70):
     
     la moyenne ponderee des rapport,  nombre total des cas
     """
-    # Delais de rehospit pour feature_to_test
-    delays = y_param[(X_param[:,short_column_label_dict[feature_to_test]]==1).todense()]
+    if feature_to_test==None:
+        delays = y_param
+    else:
+        # Delais de rehospit pour feature_to_test
+        delays = y_param[(X_param[:,short_column_label_dict[feature_to_test]]==1).todense()]
     
     # Historgramme des delais allant de 0 a lim+n
     freq = np.zeros(lim+n+1, dtype=int)
@@ -1513,7 +1611,9 @@ def calcul_mean_diff(X_param, y_param, feature_to_test, n=3, lim=70):
     else:
         response = float(target_to_neighborhood)/all_weights
     return response, all_weights # Moyenne ponderee generale, Nombre total des cas
-    
+
+
+
 # #########################################
 # Iitialisation des variables globales
 
@@ -1559,6 +1659,8 @@ if False:
     # labels y_sts et y_ets representant les delais de rehospit
     X, y_sts, y_ets = create_and_save_rsas_rehosps_X_y(rehosps_dict)
     
+    save_age_stay_length(rehosps_dict)
+    
     # Chrgement de la matrice eparse de data et des labels
     X = load_sparse(X_rehosps_sparse_file_path)
     y_sts = np.load(y_rehosps_path)['y_sts']
@@ -1569,11 +1671,18 @@ if False:
     
     # Calcul du bump score
     bump_score_df = get_features_bump_scores_as_df(X,y_sts)
-    bump_score_df_sorted = bump_score_df.sort(['bump'], ascending=False)
+    bump_score_df_sorted = bump_score_df.sort(['bump_score'], ascending=False)
+    bump_score_df.loc['all']
+    print_full_dataframe(bump_score_df_sorted) 
 
     # Graphique des delais de rehospit
     plot_rehosps_180j_array(y_sts)
     plot_rehosps_180j_array(y_ets)
+    
+    # stay_length_1
+    feature_to_test_list = ['stay_length_2']
+    plot_y_rehosps(X, y_sts, feature_to_test_list)
+    plot_y_rehosps(X, y_ets, feature_to_test_list)
     
     # Les sejours suivis pas une hospitalisation en urgence
     feature_to_test_list = ['next_emergency']
@@ -1591,6 +1700,32 @@ if False:
     # CMD 02
     feature_to_test_list = ['cmd_02']
     plot_y_rehosps(X, y_sts, feature_to_test_list)
+
+    # CMD 02
+    feature_to_test_list = ['cmd_02']
+    plot_y_rehosps(X, y_sts, feature_to_test_list)
+
+    # CMD 17
+    feature_to_test_list = ['cmd_17']
+    plot_y_rehosps(X, y_sts, feature_to_test_list)
+
+    # Ambulatoire
+    feature_to_test_list = ['complexity_ghm_J']
+    plot_y_rehosps(X, y_sts, feature_to_test_list)
+
+    # Catarracte
+    feature_to_test_list = ['cmd_02', 'cmd_17', 'complexity_ghm_J']
+    plot_y_rehosps(X, y_sts, feature_to_test_list, logical_operation='or')
+
+    # First ++ ranked variables by RFE
+    feature_to_test_list = ['type_um_36', 'cmd_02', 'type_um_61', 'cmd_17', 'cmd_23', 'cmd_01', 'stay_length_0', 'dpt_27']
+    plot_y_rehosps(X, y_sts, feature_to_test_list, logical_operation='or')
+
+    # First -- ranked variables by RFE
+    feature_to_test_list = ['type_um_23','type_um_21','type_um_34','cmd_22','type_um_42','type_um_16','next_emergency','type_um_07B','type_um_07A']
+    plot_y_rehosps(X, y_sts, feature_to_test_list, logical_operation='or')
+
+
 
     # Catarracte
     feature_to_test_list = ['cmd_02', 'complexity_ghm_J', 'type_ghm_C']
@@ -1610,15 +1745,20 @@ if False:
     feature_to_test_list = ['dpt_44']
     plot_y_rehosps(X, y_sts, feature_to_test_list)
 
-    
-    calcul_mean_diff(X, y_sts,'complexity_ghm_J')
 
     y_sts_dummy_7 = convert_to_is_multipe_of_7(y_sts)
     y_ets_dummy_7 = convert_to_is_multipe_of_7(y_ets)
+    
+    rfr_df = recursive_feature_ranking_by_bump_score(X, y_sts)
+    rfr_df.to_pickle(recusrive_bump_scores_df_file_path)
 
     # Learning by tree algorithm
+    dtc = learn_tree(X, y_sts_dummy_7, min_depth = 1, max_depth = 10)
+    print(metrics.confusion_matrix (y_sts_dummy_7,dtc.predict(X)))
+    
     learn_tree(X, y_sts_dummy_7, min_depth = 3, max_depth = 3)
-    learn_tree(X, y_ets_dummy_7, min_depth = 3, max_depth = 3)
+    dtc = learn_tree(X, y_sts_dummy_7, criterion='entropy', min_depth = 3, max_depth = 3)
+    print(metrics.confusion_matrix (y_sts_dummy_7,dtc.predict(X)))
 
     # Learning by LR algorithm
     lr = learn_lr(X, y_sts_dummy_7)
@@ -1626,6 +1766,7 @@ if False:
     y_p = lr.predict(X)
     print 'Proportion of ones in predicted Y' , float(np.sum(y_p))/len(y_p)
     print 'Proportion of ones in Y STS' , float(np.sum(y_sts_dummy_7))/len(y_sts_dummy_7)
+    print(metrics.confusion_matrix (y_sts_dummy_7,lr.predict(X)))
 
     # RFE
     rfe = feature_select_rfe_logistic_regression(X, y_sts_dummy_7, 1)
@@ -1635,7 +1776,8 @@ if False:
     rfe = load_rfe()
     ranked_labels_list = print_and_get_ranked_labels_by_RFE(rfe)
     df = get_mean_comparison_stats_as_df(X, y_sts_dummy_7, ranked_labels_list)
-    sorted_df = df.sort(['rfe_rank'], ascending=True)
+    sorted_df = df.sort(['mean_y_1'], ascending=False)
+    print_full_dataframe(df)
     
     chi2, pval_chi2 = chi2(X,y)
     f_c, pval_f = f_classif(X,y)
@@ -1661,7 +1803,7 @@ if False:
         if (feature=='age') or (feature=='stay_length'):
             continue
         print feature
-        m, n = calcul_mean_diff(X, y, feature, 3)
+        m, n = calcul_bump_score(X, y, feature, 3)
         response.append([n, np.mean(m)])
         features.append(feature)
     df = pd.DataFrame(response, index=features, columns=['n', 'r'])

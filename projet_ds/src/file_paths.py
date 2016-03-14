@@ -17,6 +17,7 @@ rsa_clean_file_path_2013 = data_directory + 'rsa13.clean.txt'
 rehosps_365_list_file_path = data_directory + 'rehosps_365_list.txt'
 rehosps_180_list_file_path = data_directory + 'rehosps_180_list.txt'
 rehosps_180_delay_dict_file_path = data_directory + 'rehosps_180_delay_dict.txt'
+age_satay_length_file_path = data_directory + 'age_stay_length.txt'
 
 
 codes_ghm_file_path = refs_directory + 'codes_ghm.txt'
@@ -39,6 +40,7 @@ rfe_file_path = results_directory + 'rfe'
 dtc_file_path = results_directory + 'dtc'
 tree_dot_file_path = results_directory + 'dtc.dot'
 tree_pdf_file_path = results_directory + 'dtc.pdf'
+recusrive_bump_scores_df_file_path = results_directory + 'recursive_bum_scores.pickle'
 
 rehosps_x7j_dict_file_pah = data_directory + 'rehosps_x7j_dict'
 X_rehosps_sparse_file_path = data_directory + 'X_rehosps_sparse.npz'
