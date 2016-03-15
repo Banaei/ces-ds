@@ -1444,33 +1444,44 @@ def print_full_dataframe(df):
 
 def recursive_feature_ranking_by_bump_score(X_param, y_param):
     
+    null_features = ['cmd_24', 'cmd_28', 'cmd_90', 'complexity_ghm_E', 'complexity_ghm_S', 'complexity_ghm_V', 'complexity_ghm_W', 'dpt_99', 'type_ghm_H', 'type_um_35', 'type_um_88']
     ranked_features_list = list()
     bs_list = list()
-    for i in range(len(short_column_label_dict)):
+    count_list = list()
+    for i in range(len(short_column_label_dict)-len(null_features)):
         min_bs = 1000000000
+        print '\n*************************\n'
         print str(i), '\n'
         print ranked_features_list, '\n'
         print bs_list, '\n'
+        print count_list, '\n'
         selected_feature = None
         selected_bs = 0
+        selected_count = 0
         indexes_avec = np.zeros(y_param.shape, dtype=bool)
         for ranked_feature in ranked_features_list:
             indexes_avec = np.logical_or(indexes_avec, (X_param[:,short_column_label_dict[ranked_feature]]==1).todense())
         for feature in short_column_label_list:
             if feature in ranked_features_list:
                 continue
-            print '\r', feature, str(min_bs), '                                           ',
+            if feature in null_features:
+                continue
+            print '\r', str(i), feature, str(min_bs), '                                           ',
             indexes_avec_to_test = np.logical_or(indexes_avec, (X_param[:,short_column_label_dict[feature]]==1).todense())
             bs, count = calcul_bump_score(X_param, y_param[indexes_avec_to_test], None)
             if (bs<min_bs):
                 selected_feature = feature
                 selected_bs = bs
+                selected_count = count
                 min_bs = bs
-        ranked_features_list.append(selected_feature)
+        if (selected_feature!=None):
+            ranked_features_list.append(selected_feature)
         bs_list.append(selected_bs)
-    df = pd.DataFrame(index=ranked_features_list, columns=['bump_score'])
-    for feature, bs in zip(ranked_features_list,  bs_list):
+        count_list.append(selected_count)
+    df = pd.DataFrame(index=ranked_features_list, columns=['bump_score', 'count'])
+    for feature, bs, count in zip(ranked_features_list,  bs_list, count_list):
         df.set_value(feature, 'bump_score', bs)
+        df.set_value(feature, 'count', count)
     df.to_pickle(recusrive_bump_scores_df_file_path)
     return df
 
@@ -1543,6 +1554,34 @@ def plot_y_rehosps(X_param, y_param, feature_to_test_list, logical_operation='an
     plt.ylabel('Nombre de sejours')
     plt.legend(loc="best")
     plt.show()   
+
+
+def plot_rfs_df(df):
+    """
+    Trace les courbes de l'evolution des bump_score et count issues d'uen recursive data selection
+    
+    Parameters
+    ----------
+    de : DataFrame ayant ppour index les variables et pour colonnes 'bump_score' et 'count'
+
+    """
+    plt.figure(1)
+    plt.subplot(211)
+    plt.plot(df['bump_score'], label='Bump score')
+    plt.title('Evolution du bump score au cours de la Recursive Feature Selection')
+    plt.xlabel('Nombre de variables')
+    plt.ylabel('Bump score')
+    plt.legend(loc="best")
+
+    plt.subplot(212)
+    plt.plot(df['count'], label='Effectif')
+    plt.title('Evolution du nombre de sejours')
+    plt.xlabel('Nombre de variables')
+    plt.ylabel('Effectif')
+    plt.legend(loc="best")
+    plt.show()   
+
+
 
 
 def calcul_bump_score(X_param, y_param, feature_to_test, n=3, lim=70):
@@ -1749,8 +1788,13 @@ if False:
     y_sts_dummy_7 = convert_to_is_multipe_of_7(y_sts)
     y_ets_dummy_7 = convert_to_is_multipe_of_7(y_ets)
     
-    rfr_df = recursive_feature_ranking_by_bump_score(X, y_sts)
-    rfr_df.to_pickle(recusrive_bump_scores_df_file_path)
+    # Recursive feature selection by bump score
+    # Calcul (trop long)
+    rfs_df = recursive_feature_ranking_by_bump_score(X, y_sts)
+    # Lecture du fichier deja calcule
+    rfs_df = pd.read_pickle(recusrive_bump_scores_df_file_path)
+    plot_rfs_df(rfs_df)
+    print_full_dataframe(rfs_df)
 
     # Learning by tree algorithm
     dtc = learn_tree(X, y_sts_dummy_7, min_depth = 1, max_depth = 10)
@@ -1828,3 +1872,4 @@ if False:
     pca_0.components_ 
     pca_1.explained_variance_ratio_
     pca_0.explained_variance_ratio_ 
+    
