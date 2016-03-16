@@ -34,9 +34,12 @@ codes_type_ghm_file_path = refs_directory + 'codes_type_ghm.txt'
 codes_complexity_ghm_file_path = refs_directory + 'codes_complexity_ghm.txt'
 codes_um_urgences_file_path = refs_directory + 'codes_type_um_urg.txt'
 ipe_prives_file_path = refs_directory + 'codes_es_prives.txt'
+codes_racines_ghm_file_path = refs_directory + 'codes_racines_ghm.txt'
+codes_chapitres_cim_file_path = refs_directory + 'codes_chapitres_cim10.txt'
 
 column_label_full_dict_file_path = refs_directory + 'full_cld'
 column_label_short_dict_file_path = refs_directory + 'short_cld'
+column_label_urg_dict_file_path = refs_directory + 'urg_cld'
 codes_um_urgences_dict_file_path = data_directory + 'um_urgences_dict'
 ipe_prives_dict_file_path = data_directory + 'ipe_prives_dict'
 

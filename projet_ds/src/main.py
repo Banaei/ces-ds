@@ -30,6 +30,7 @@ imp.reload(file_paths)
 
 full_column_label_dict = {}
 short_column_label_dict = {}
+urg_column_label_dict = {}
 codes_um_urgences_dict = {}
 ipe_prive_dict = {}
 short_column_label_list = list()    
@@ -56,8 +57,8 @@ def create_and_save_global_refs():
     
     short_column_label_dict a les libelles suivants :
     
-    - age
-    - stay_length
+    - age : age_0 à age_75 (classes de 5 ans)
+    - stay_length : 0, 1, 2, 3, 4, 5, 10, 15, ..., 65 classes de 5 and
     - private
     - emergency
     - sex
@@ -68,8 +69,8 @@ def create_and_save_global_refs():
     
     full_column_label_dict a les libelles suivants
     
-    - age
-    - stay_length
+    - age : age_0 à age_75 (classes de 5 ans)
+    - stay_length : 0, 1, 2, 3, 4, 5, 10, 15, ..., 65 classes de 5 and
     - private
     - emergency
     - sex
@@ -82,10 +83,23 @@ def create_and_save_global_refs():
     - das_*
     - acte_*
     
+    urg_column_label_dict a les libelles suivants
+    
+    - age : age_0 à age_75 (classes de 5 ans)
+    - stay_length : 0, 1, 2, 3, 4, 5, 10, 15, ..., 65 classes de 5 and
+    - private
+    - sex
+    - dpt_*
+    - racine_ghm_*
+    - complexity_ghm_*
+    - type_um_*
+    - diag_* (chapitre cim 10 -- les 3 premiers caracteres)
+    
     Cahque dict a comme key le nom de la colonne et comme value le numero de la colonne. Ce numero n'est pas dans l'ordre et depend
     de l'algorithm specifique du dict. Seule certitute : les colonnes age et stay_length ont pour index 0 et 1 respectivement. 
     Il s'agit des seules variables numeriques non binaires que j'ai voulu mettre en premier.
-    Les deux dicts sont enregistres dans les fichiers full_dict_file_path et short_dict_file_path (renseignes dans le fichier file_paths).
+
+    Les 3 dicts sont enregistres dans les fichiers full_dict_file_path, urg_dict_file_path, et short_dict_file_path (renseignes dans le fichier file_paths).
     
     codes_um_urgences_dict contient les codes UM correspondant aux urgences.
     
@@ -95,11 +109,13 @@ def create_and_save_global_refs():
 
     global full_column_label_dict
     global short_column_label_dict
+    global urg_column_label_dict
     global codes_um_urgences_dict
     global ipe_prive_dict
     
     full_column_label_dict.clear()
     short_column_label_dict.clear()
+    urg_column_label_dict.clear()
     codes_um_urgences_dict.clear()
     ipe_prive_dict.clear()
     
@@ -147,6 +163,25 @@ def create_and_save_global_refs():
     add_column_labels_from_file_to_dict(codes_complexity_ghm_file_path, short_column_label_dict, 'complexity_ghm_')
     add_column_labels_from_file_to_dict(codes_type_um_file_path, short_column_label_dict, 'type_um_')
 
+    for i in range(0,76,5):
+        urg_column_label_dict['age_' + str(i)] = 0
+    urg_column_label_dict['stay_length_0'] = 0
+    urg_column_label_dict['stay_length_1'] = 0
+    urg_column_label_dict['stay_length_2'] = 0
+    urg_column_label_dict['stay_length_3'] = 0
+    urg_column_label_dict['stay_length_4'] = 0
+    for i in range(5,66,5):
+        urg_column_label_dict['stay_length_' + str(i)] = 0
+    urg_column_label_dict['sex'] = 0
+    urg_column_label_dict['private'] = 0
+    add_column_labels_from_file_to_dict(codes_cmd_file_path, urg_column_label_dict, 'cmd_')
+    add_column_labels_from_file_to_dict(codes_departement_file_path, urg_column_label_dict, 'dpt_')
+    add_column_labels_from_file_to_dict(codes_type_ghm_file_path, urg_column_label_dict, 'type_ghm_')
+    add_column_labels_from_file_to_dict(codes_complexity_ghm_file_path, urg_column_label_dict, 'complexity_ghm_')
+    add_column_labels_from_file_to_dict(codes_type_um_file_path, urg_column_label_dict, 'type_um_')
+    add_column_labels_from_file_to_dict(codes_chapitres_cim_file_path, urg_column_label_dict, 'diag_')
+        
+        
     
     index = 0
     for key in full_column_label_dict:
@@ -162,11 +197,20 @@ def create_and_save_global_refs():
         short_column_label_dict[key] = index
         index += 1
 
+    urg_cols_list = list(urg_column_label_dict.keys())
+    urg_cols_list.sort()
+    for col_name, i in zip(urg_cols_list,range(len(urg_cols_list))):
+        urg_column_label_dict[col_name] = i
+
+
     with open(column_label_full_dict_file_path, 'w') as f:
         pickle.dump(full_column_label_dict, f)
         
     with open(column_label_short_dict_file_path, 'w') as f:
         pickle.dump(short_column_label_dict, f)
+        
+    with open(column_label_urg_dict_file_path, 'w') as f:
+        pickle.dump(urg_column_label_dict, f)
         
     with open(codes_um_urgences_file_path) as codes_file:
         for code in codes_file:
@@ -194,6 +238,7 @@ def init_globals():
     """
     global full_column_label_dict 
     global short_column_label_dict 
+    global urg_column_label_dict 
     global codes_um_urgences_dict
     global ipe_prive_dict
     global short_column_label_list
@@ -255,6 +300,32 @@ def load_short_column_labels(dict_file_path=column_label_short_dict_file_path):
     - complexity_ghm_*
     - type_um_*
     Returns : column_label_list, column_label_dict
+    """
+    with open(dict_file_path) as f:
+        column_label_dict = pickle.load(f)
+    return column_label_dict
+
+def load_urg_column_labels(dict_file_path=column_label_urg_dict_file_path):
+    """
+    Lit la liste et le dict des noms de colonnes pour l'etude des urgences a partir des fichiers et les renvoie
+    - age : age_0 à age_75 (classes de 5 ans)
+    - stay_length : 0, 1, 2, 3, 4, 5, 10, 15, ..., 65 classes de 5 and
+    - private
+    - sex
+    - dpt_*
+    - racine_ghm_*
+    - complexity_ghm_*
+    - type_um_*
+    - diag_* (chapitre cim 10 -- les 3 premiers caracteres)
+    
+    Parameters :
+    ----------
+    dict_file_path : fichier du dict
+        default : column_label_urg_dict_file_path
+    
+    Returns:
+    -------
+    column_label_list, column_label_dict
     """
     with open(dict_file_path) as f:
         column_label_dict = pickle.load(f)
@@ -379,17 +450,20 @@ def get_rsa_data(rsa, rsa_format, verbose=None):
     Retrouve les informations suivntes :
     
         index,
+        racine_ghm,
         cmd,
+        type_ghm,
+        complexity_ghm,
         sex,
         departement,
         private,
         dp,
+        chapitre_dp,
         dr,
+        chapitre_dr,
         urgence,
         age,
         stay_length,
-        type_ghm,
-        complexity_ghm,
         type_um,
         das,
         actes,
@@ -404,7 +478,10 @@ def get_rsa_data(rsa, rsa_format, verbose=None):
             -error : boolean. True s'il y a eu une erreur dans le RSA
             -un dict du format :
                 'index':index du RSA. Sans interet veritale
+                'racine_ghm' : CMD + Typ
                 'cmd': cateorie majeur de diagnostic
+                'type_ghm': type du groupe homogene de malade (GHM),
+                'complexity_ghm': complexite du GHM,
                 'sex': sex
                 'dpt': departement (code à deux chiffres)
                 'private': prive
@@ -413,8 +490,6 @@ def get_rsa_data(rsa, rsa_format, verbose=None):
                 'emergency': admis dans le cadre d'urgence 0/1
                 'age': age
                 'stay_length': duree du sejour
-                'type_ghm': type du groupe homogene de malade (GHM),
-                'complexity_ghm': complexite du GHM,
                 'type_um': la liste des differents unites medicales (UM) frequentees durant ce sejour
                 'das': la liste des diagnostics associes (DAS)
                 'actes': la liste des actes realises durant le sejour (codes CCAM : Classification Commune des Actes Medicaux)
@@ -431,6 +506,10 @@ def get_rsa_data(rsa, rsa_format, verbose=None):
     index = int(rsa[rsa_format['index_sp']-1:rsa_format['index_ep']].strip())
     
     sex = int(rsa[rsa_format['sex_sp']-1:rsa_format['sex_ep']].strip())
+    if sex==1:
+        sex=0  # homme
+    else:
+        sex=1 # femme
     
     finess = rsa[rsa_format['finess_sp' ]-1:rsa_format['finess_ep']].strip()  
     is_private = 0
@@ -1772,7 +1851,7 @@ def detect_and_save_rehosps_urg_dict(delai_rehosp=360, ano_file_path=ano_clean_f
             last_line_number = 0
             current_sej_num = 0
             for element in element_list:
-                diags_related = 0
+                are_diags_related = 0
                 if (first_stay):
                     last_sej_num = element['sej_num']
                     last_stay_length = element['stay_length']
@@ -1794,8 +1873,8 @@ def detect_and_save_rehosps_urg_dict(delai_rehosp=360, ano_file_path=ano_clean_f
                         # Ne prend en compte que les readmissions en urgences
                         if delay_end_to_start>0 and delay_end_to_start <= delai_rehosp:
                             if (last_dp_racine==current_dp_racine or last_dp_racine==current_dr_racine or last_dr_racine==current_dp_racine or last_dr_racine==current_dr_racine):
-                                diags_related = 1
-                            rehosps_delay_dict[last_line_number] = [delay_end_to_start, diags_related]
+                                are_diags_related = 1
+                            rehosps_delay_dict[last_line_number] = [delay_end_to_start, are_diags_related]
                             rehosps_number += 1
                     last_sej_num = current_sej_num
                     last_stay_length = element['stay_length']
@@ -1833,6 +1912,7 @@ if False:
     # Globals
     full_column_label_dict
     short_column_label_dict
+    urg_column_label_dict
     codes_um_urgences_dict
     ipe_prive_dict
     short_column_label_list
