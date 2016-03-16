@@ -52,3 +52,5 @@ recusrive_bump_scores_df_file_path = results_directory + 'recursive_bum_scores.p
 rehosps_x7j_dict_file_pah = data_directory + 'rehosps_x7j_dict'
 X_rehosps_sparse_file_path = data_directory + 'X_rehosps_sparse.npz'
 y_rehosps_path = data_directory + 'y_rehosps.npz'
+X_rehosps_urg_sparse_file_path = data_directory + 'X_rehosps_urg_sparse.npz'
+y_rehosps_urg_path = data_directory + 'y_rehosps_urg.npz'

@@ -1891,6 +1891,121 @@ def detect_and_save_rehosps_urg_dict(delai_rehosp=360, ano_file_path=ano_clean_f
     return rehosps_delay_dict
 
 
+def rsa_to_X_urg(rsa_data_dict, X, i):
+    """
+    Trasforme les informations contenues dans le dict rsa_dict en une ligne (la ligne i) de la matrice X. La colonne
+    ou sera placee chaque information est celle donnee par short_column_label_dict
+    
+    Parameters
+    ----------
+    
+    rsa_dict : le dict contenant les informations du RSA
+    
+    next_emergency : 0 ou 1, indique si le sejour suivant est urgences ou non
+        
+    X : La matrice ou il faut ecrire les informations (une ligne)
+        
+    i : la ligne de la matrice
+        
+    """
+    global urg_column_label_dict
+    rsa_info_dict = rsa_data_dict[1]
+    age = rsa_info_dict['age']
+    stay_length = rsa_info_dict['stay_length']
+    
+    if age==0:
+        X[i, urg_column_label_dict['age_0']] = 1
+    else:
+        if age>70:
+            age=71
+        if age%5==0:
+            X[i, urg_column_label_dict['age_'+str(age)]] = 1
+        else:
+            X[i, urg_column_label_dict['age_'+str(((age/5)+1)*5)]] = 1
+    
+    if stay_length==0:
+        X[i, urg_column_label_dict['stay_length_0']] = 1
+    elif stay_length==1:
+        X[i, urg_column_label_dict['stay_length_1']] = 1
+    elif stay_length==2:
+        X[i, urg_column_label_dict['stay_length_2']] = 1
+    elif stay_length==3:
+        X[i, urg_column_label_dict['stay_length_3']] = 1
+    elif stay_length==4:
+        X[i, urg_column_label_dict['stay_length_4']] = 1
+    else:
+        if stay_length>60:
+            stay_length=61
+        if stay_length%5==0:
+            X[i, urg_column_label_dict['stay_length_'+str(stay_length)]] = 1
+        else:
+            X[i, short_column_label_dict['stay_length_'+str(((stay_length/5)+1)*5)]] = 1
+    X[i, urg_column_label_dict['sex']]=rsa_info_dict['sex']
+    X[i, urg_column_label_dict['private']]=rsa_info_dict['private']
+    X[i, urg_column_label_dict['dpt_' + rsa_info_dict['dpt']]]=1
+    X[i, urg_column_label_dict['cmd_' + rsa_info_dict['cmd']]]=1
+    X[i, urg_column_label_dict['type_ghm_' + rsa_info_dict['type_ghm']]]=1
+    X[i, urg_column_label_dict['complexity_ghm_' + rsa_info_dict['complexity_ghm']]]=1
+    X[i, urg_column_label_dict['diag_' + rsa_info_dict['chapitre_dp']]]=1
+    X[i, urg_column_label_dict['diag_' + rsa_info_dict['chapitre_dr']]]=1
+    for t_u in rsa_info_dict['type_um']:
+        X[i, urg_column_label_dict['type_um_' + t_u]]=1
+    
+    
+def create_and_save_rsas_rehosps_urg_X_y(rehosps_dict, rsas_file_path=rsa_clean_file_path_2013, rsa_format=rsa_2013_format, X_out_file_path=X_rehosps_urg_sparse_file_path, y_out_file_path=y_rehosps_urg_path):
+    '''
+    This method parses the lines of the file rsas_file_path and takes only those whose line_number (starting from 1) are 
+    included in rehosps_dict, i. e. the RSAs with rehosp. 
+    
+    Parameters
+    ----------
+    reshosps_dict : {line_number:rehosp_delay}
+    
+    cld : column_labels_dict
+    
+    rsas_file_path : RSA file
+        default : rsa_clean_file_path_2013
+    rsa_format : RSA format
+        default : rsa_2013_format
+    X_out_file_path : fichier de sauvegarde de X
+        default : X_rehosps_sparse_file_path
+    y_out_fle_path = fichier de sortie de y
+        default : y_rehosps_x_path
+        
+    Returns
+    -------
+    X : saprse CSR matrix containing len(cld) columns (features)
+        
+    Y : array contenant le delais de reospitalisation
+    '''
+    global short_column_label_dict
+    line_number = 1
+    i = 0
+    rows_count = len(rehosps_dict)
+    cols_count = len(urg_column_label_dict)
+    sparse_X = sparse.lil_matrix((rows_count, cols_count))
+    y_delay = np.zeros((rows_count, 1))
+    y_diags_related = np.zeros((rows_count, 1))
+
+    with open(rsas_file_path) as rsa_file:
+        while True:
+            rsa_line = rsa_file.readline().strip()
+            if (line_number in rehosps_dict):
+                error, rsa_data_dict = get_rsa_data(rsa_line, rsa_format)
+                y_delay[i] = rehosps_dict[line_number][0]
+                y_diags_related[i] = rehosps_dict[line_number][1]
+                rsa_to_X_urg(rsa_data_dict, sparse_X, i)
+                i += 1
+            line_number += 1
+            if line_number % 10000 == 0:
+                print '\rLines processed ', line_number, ', % processed ', (i*100/rows_count),
+            if (not rsa_line):
+                break
+
+    X = sparse_X.tocsr()
+    save_sparse(X_out_file_path, X)
+    np.savez_compressed(y_out_file_path, y_delay=y_delay, y_diags_related=y_diags_related)
+    return X, y_delay, y_diags_related    
     
 # #############################################################################
 # #############################################################################
@@ -2129,3 +2244,4 @@ if False:
     
     rehosps_urg_dict = detect_and_save_rehosps_urg_dict()
     rehosps_urg_dict = load_picke(rehosps_urg_30_delay_dict_file_path)
+    X, y_delay, y_diags_related = create_and_save_rsas_rehosps_urg_X_y(rehosps_urg_dict)
