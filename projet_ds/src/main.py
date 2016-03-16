@@ -2253,4 +2253,8 @@ if False:
     
     rehosps_urg_dict = detect_and_save_rehosps_urg_dict()
     rehosps_urg_dict = load_picke(rehosps_urg_30_delay_dict_file_path)
-    X, y_delay, y_diags_related = create_and_save_rsas_rehosps_urg_X_y(rehosps_urg_dict)
+    X_urg, y_urg_delay, y_urg_diags_related = create_and_save_rsas_rehosps_urg_X_y(rehosps_urg_dict)
+    X_urg = load_sparse(X_rehosps_urg_sparse_file_path)
+    y_urg_delay = np.load(y_rehosps_urg_path)['y_delay']
+    y_urg_diags_related = np.load(y_rehosps_urg_path)['y_diags_related']
+    
