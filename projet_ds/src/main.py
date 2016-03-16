@@ -1697,10 +1697,11 @@ def convert_to_is_multipe_of_7(y):
 # #############################################################################
 # #############################################################################
 
-def detect_and_save_rehosps_urg_30_dict(delai_rehosp=360, ano_file_path=ano_clean_file_path_2013, ano_format=ano_2013_format, rsa_file_path=rsa_clean_file_path_2013, rsa_format=rsa_2013_format, rehosps_file_path=rehosps_urg_30_delay_dict_file_path):
+def detect_and_save_rehosps_urg_dict(delai_rehosp=360, ano_file_path=ano_clean_file_path_2013, ano_format=ano_2013_format, rsa_file_path=rsa_clean_file_path_2013, rsa_format=rsa_2013_format, rehosps_file_path=rehosps_urg_30_delay_dict_file_path):
     """
-    Detecte les sejours ayant donne lieu a une r-hospitalisation en urgences dans un délai de delai_rehosp jours max (après la fin) 
-    parmi les sejours et enregistre un dict {line_number:delay}.
+    Detecte les sejours ayant donne lieu a une rehospitalisation en urgences dans un délai de delai_rehosp jours max (après la fin) 
+    parmi les sejours et enregistre un dict {line_number:delay}. Il compare egalement les dp et dr des deux hospits successives et signale s'il y a une 
+    equivalenc. Pour cette comparaisoon il utilise les 3 premiers caracters du code cim (la racine)
     Seuls les delais >0 et <= delai_rehosp sont detectes
     
     Parameters
@@ -1768,8 +1769,8 @@ def detect_and_save_rehosps_urg_30_dict(delai_rehosp=360, ano_file_path=ano_clea
                     last_sej_num = element['sej_num']
                     last_stay_length = element['stay_length']
                     last_line_number = element['line_number']
-                    last_dp = element['dp']
-                    last_dr = element['dr']
+                    last_dp_racine = element['dp'][0:3]
+                    last_dr_racine = element['dr'][0:3]
                     first_stay = False
                     continue
                 else:
@@ -1778,22 +1779,22 @@ def detect_and_save_rehosps_urg_30_dict(delai_rehosp=360, ano_file_path=ano_clea
                         # Ne prend en compte que les readmissions en urgences
                         continue
                     current_sej_num = element['sej_num']
-                    current_dp = element['dp']
-                    current_dr = element['dr']
+                    current_dp_racine = element['dp'][0:3]
+                    current_dr_racine = element['dr'][0:3]
                     delay_end_to_start = current_sej_num - (last_sej_num + last_stay_length)
                     if (delay_end_to_start<0):
                         error_number += 1
                         break
                     if delay_end_to_start>0 and delay_end_to_start <= delai_rehosp:
-                        if (last_dp==current_dp or last_dp==current_dr or last_dr==current_dp or last_dr==current_dr):
+                        if (last_dp_racine==current_dp_racine or last_dp_racine==current_dr_racine or last_dr_racine==current_dp_racine or last_dr_racine==current_dr_racine):
                             diags_related = 1
                         rehosps_delay_dict[last_line_number] = [delay_end_to_start, diags_related]
                         rehosps_number += 1
                     last_sej_num = current_sej_num
                     last_stay_length = element['stay_length']
                     last_line_number = element['line_number']
-                    last_dp = element['dp']
-                    last_dr = element['dr']
+                    last_dp_racine = element['dp'][0:3]
+                    last_dr_racine = element['dr'][0:3]
         if line_number % 100000 == 0:
                 print '\rRehosp detection : processed ', line_number, 'Errors : ', error_number, 'rehosps taken : ', rehosps_number,
         line_number += 1
@@ -2039,4 +2040,4 @@ if False:
     np.min(y_next_emergency_30)
     len(y_next_emergency_30)
     
-    detect_and_save_rehosps_urg_30_dict
+    rehosps_urg_dict = detect_and_save_rehosps_urg_30_dict()
