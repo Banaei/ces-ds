@@ -450,17 +450,33 @@ def get_rsa_data(rsa, rsa_format, verbose=None):
             print 'Error in CMD %s, RSA ignored' % (cmd)
         error = True
     
+    type_ghm = rsa[rsa_format['type_ghm_sp']-1:rsa_format['type_ghm_ep']].strip()
+    if (not check_code(type_ghm, type_ghm=True)):
+        if verbose:
+            print 'Error in TYPE GHM %s, RSA ignored' % (type_ghm)
+        error = True
+        
+    racine_ghm = cmd + type_ghm
+    
+    complexity_ghm = rsa[rsa_format['complexity_ghm_sp']-1:rsa_format['complexity_ghm_ep']].strip()
+    if (not check_code(complexity_ghm, complexity_ghm=True)):
+        if verbose:
+            print 'Error in COMPLEXITY OF GHM %s, RSA ignored' % (complexity_ghm)
+        error = True
+
     dp = rsa[rsa_format['dp_sp'] - 1:rsa_format['dp_ep']].strip()
     if (not check_code(dp, cim=True)):
         if verbose:
             print 'Error in DP %s, RSA ignored' % (dp)
         error = True
+    chapitre_dp = dp[0:3]
         
     dr = rsa[rsa_format['dr_sp'] - 1:rsa_format['dr_ep']].strip()
     if (len(dr)>0) and (not check_code(dr, cim=True)):
         if verbose:
             print 'Error in DR %s, RSA ignored' % (dr)
         error = True
+    chapitre_dr = dr[0:3]
 
     try:
         age = int(rsa[rsa_format['age_in_year_sp'] - 1:rsa_format['age_in_year_ep']].strip())
@@ -469,17 +485,6 @@ def get_rsa_data(rsa, rsa_format, verbose=None):
         
     stay_length = int(rsa[rsa_format['stay_length_sp'] - 1:rsa_format['stay_length_ep']].strip())
     
-    type_ghm = rsa[rsa_format['type_ghm_sp']-1:rsa_format['type_ghm_ep']].strip()
-    if (not check_code(type_ghm, type_ghm=True)):
-        if verbose:
-            print 'Error in TYPE GHM %s, RSA ignored' % (type_ghm)
-        error = True
-    
-    complexity_ghm = rsa[rsa_format['complexity_ghm_sp']-1:rsa_format['complexity_ghm_ep']].strip()
-    if (not check_code(complexity_ghm, complexity_ghm=True)):
-        if verbose:
-            print 'Error in COMPLEXITY OF GHM %s, RSA ignored' % (complexity_ghm)
-        error = True
     
     fixed_zone_length = int(rsa_format['fix_zone_length'])
     nb_aut_pgv = int(rsa[rsa_format['nb_aut_pgv_sp'] - 1:rsa_format['nb_aut_pgv_ep']].strip())
@@ -561,14 +566,17 @@ def get_rsa_data(rsa, rsa_format, verbose=None):
         'age':age,
         'stay_length':stay_length,
         'cmd':cmd,
+        'type_ghm':type_ghm,
+        'complexity_ghm':complexity_ghm,
+        'racine_ghm':racine_ghm,
         'sex':sex,
         'dpt':departement,
         'private': is_private,
         'dp':dp,
+        'chapitre_dp':chapitre_dp,
         'dr':dr,
+        'chapitre_dr':chapitre_dr,
         'emergency':urgence,
-        'type_ghm':type_ghm,
-        'complexity_ghm':complexity_ghm,
         'type_um':type_um_dict.keys(),
         'das':das_dict.keys(),
         'actes':actes_dict.keys(),
@@ -2040,3 +2048,4 @@ if False:
     len(y_next_emergency_30)
     
     rehosps_urg_dict = detect_and_save_rehosps_urg_dict()
+    rehosps_urg_dict = load_picke(rehosps_urg_30_delay_dict_file_path)
