@@ -1775,9 +1775,6 @@ def detect_and_save_rehosps_urg_dict(delai_rehosp=360, ano_file_path=ano_clean_f
                     continue
                 else:
                     urgence = element['urgence']
-                    if (urgence!=1):
-                        # Ne prend en compte que les readmissions en urgences
-                        continue
                     current_sej_num = element['sej_num']
                     current_dp_racine = element['dp'][0:3]
                     current_dr_racine = element['dr'][0:3]
@@ -1785,11 +1782,13 @@ def detect_and_save_rehosps_urg_dict(delai_rehosp=360, ano_file_path=ano_clean_f
                     if (delay_end_to_start<0):
                         error_number += 1
                         break
-                    if delay_end_to_start>0 and delay_end_to_start <= delai_rehosp:
-                        if (last_dp_racine==current_dp_racine or last_dp_racine==current_dr_racine or last_dr_racine==current_dp_racine or last_dr_racine==current_dr_racine):
-                            diags_related = 1
-                        rehosps_delay_dict[last_line_number] = [delay_end_to_start, diags_related]
-                        rehosps_number += 1
+                    if (urgence==1):
+                        # Ne prend en compte que les readmissions en urgences
+                        if delay_end_to_start>0 and delay_end_to_start <= delai_rehosp:
+                            if (last_dp_racine==current_dp_racine or last_dp_racine==current_dr_racine or last_dr_racine==current_dp_racine or last_dr_racine==current_dr_racine):
+                                diags_related = 1
+                            rehosps_delay_dict[last_line_number] = [delay_end_to_start, diags_related]
+                            rehosps_number += 1
                     last_sej_num = current_sej_num
                     last_stay_length = element['stay_length']
                     last_line_number = element['line_number']
@@ -2040,4 +2039,4 @@ if False:
     np.min(y_next_emergency_30)
     len(y_next_emergency_30)
     
-    rehosps_urg_dict = detect_and_save_rehosps_urg_30_dict()
+    rehosps_urg_dict = detect_and_save_rehosps_urg_dict()
