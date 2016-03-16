@@ -246,6 +246,7 @@ def init_globals():
     
     full_column_label_dict = load_full_column_labels()
     short_column_label_dict = load_short_column_labels()
+    urg_column_label_dict = load_urg_column_labels()
     codes_um_urgences_dict = load_codes_um_urgences_dict()
     ipe_prive_dict = load_ipe_private_dict()
     
@@ -1891,7 +1892,7 @@ def detect_and_save_rehosps_urg_dict(delai_rehosp=360, ano_file_path=ano_clean_f
     return rehosps_delay_dict
 
 
-def rsa_to_X_urg(rsa_data_dict, X, i):
+def rsa_to_X_urg(rsa_info_dict, X, i):
     """
     Trasforme les informations contenues dans le dict rsa_dict en une ligne (la ligne i) de la matrice X. La colonne
     ou sera placee chaque information est celle donnee par short_column_label_dict
@@ -1909,7 +1910,6 @@ def rsa_to_X_urg(rsa_data_dict, X, i):
         
     """
     global urg_column_label_dict
-    rsa_info_dict = rsa_data_dict[1]
     age = rsa_info_dict['age']
     stay_length = rsa_info_dict['stay_length']
     
@@ -1946,8 +1946,17 @@ def rsa_to_X_urg(rsa_data_dict, X, i):
     X[i, urg_column_label_dict['cmd_' + rsa_info_dict['cmd']]]=1
     X[i, urg_column_label_dict['type_ghm_' + rsa_info_dict['type_ghm']]]=1
     X[i, urg_column_label_dict['complexity_ghm_' + rsa_info_dict['complexity_ghm']]]=1
-    X[i, urg_column_label_dict['diag_' + rsa_info_dict['chapitre_dp']]]=1
-    X[i, urg_column_label_dict['diag_' + rsa_info_dict['chapitre_dr']]]=1
+    if (len(rsa_info_dict['chapitre_dp'])>0):
+        try:
+            X[i, urg_column_label_dict['diag_' + rsa_info_dict['chapitre_dp']]]=1
+        except KeyError:
+            print 'Error : ', rsa_info_dict['chapitre_dp']
+    if (len(rsa_info_dict['chapitre_dr'])>0):
+        try:
+            X[i, urg_column_label_dict['diag_' + rsa_info_dict['chapitre_dr']]]=1
+        except KeyError:
+            print 'Error : ', rsa_info_dict['chapitre_dr']
+            
     for t_u in rsa_info_dict['type_um']:
         X[i, urg_column_label_dict['type_um_' + t_u]]=1
     
