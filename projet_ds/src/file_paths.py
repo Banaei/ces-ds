@@ -20,6 +20,10 @@ rehosps_180_delay_dict_file_path = data_directory + 'rehosps_180_delay_dict.txt'
 age_satay_length_file_path = data_directory + 'age_stay_length.txt'
 
 
+rehosps_urg_30_delay_dict_file_path = data_directory + 'rehosps_urg_30_delay_dict.txt'
+
+
+
 codes_ghm_file_path = refs_directory + 'codes_ghm.txt'
 codes_cim_file_path = refs_directory + 'codes_cim10.txt'
 codes_ccam_file_path = refs_directory + 'codes_ccam.txt'

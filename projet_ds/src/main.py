@@ -22,6 +22,7 @@ from sklearn import tree
 import os
 from sklearn.linear_model import LogisticRegression
 from sklearn import metrics
+from sklearn import preprocessing
 from sklearn.feature_selection import chi2, f_classif
 
 imp.reload(file_paths)
@@ -349,6 +350,29 @@ def is_rsa_ok(line, rsa_format):
 
     return (mode_sortie_dc + cmd_90 + cmd_28) == 0
 
+
+
+
+# *************************************************************************************************
+# *************************************************************************************************
+# *************************************************************************************************
+#                   Cas-Control methods
+# *************************************************************************************************
+# *************************************************************************************************
+# *************************************************************************************************
+
+
+
+
+
+
+# *************************************************************************************************
+# *************************************************************************************************
+# *************************************************************************************************
+#                   work area
+# *************************************************************************************************
+# *************************************************************************************************
+# *************************************************************************************************
 
 def get_rsa_data(rsa, rsa_format, verbose=None):
     """
@@ -1566,19 +1590,28 @@ def plot_rfs_df(df):
 
     """
     plt.figure(1)
-    plt.subplot(211)
+    plt.subplot(311)
     plt.plot(df['bump_score'], label='Bump score')
-    plt.title('Evolution du bump score au cours de la Recursive Feature Selection')
+#    plt.title('Evolution du bump score au cours de la Recursive Feature Selection')
     plt.xlabel('Nombre de variables')
     plt.ylabel('Bump score')
     plt.legend(loc="best")
 
-    plt.subplot(212)
+    plt.subplot(312)
     plt.plot(df['count'], label='Effectif')
-    plt.title('Evolution du nombre de sejours')
+#    plt.title('Evolution du nombre de sejours')
     plt.xlabel('Nombre de variables')
     plt.ylabel('Effectif')
     plt.legend(loc="best")
+    
+    plt.subplot(313)
+    plt.plot(df['count'], df['bump_score'])
+#    plt.title('Evolution du score en fonction du nombre de sejours')
+    plt.xlabel('Effectif')
+    plt.ylabel('Bump Score')
+    
+    plt.legend(loc="best")
+    
     plt.show()   
 
 
@@ -1651,21 +1684,123 @@ def calcul_bump_score(X_param, y_param, feature_to_test, n=3, lim=70):
         response = float(target_to_neighborhood)/all_weights
     return response, all_weights # Moyenne ponderee generale, Nombre total des cas
 
-
-
-# #########################################
-# Iitialisation des variables globales
-
-
-
-
 def convert_to_is_multipe_of_7(y):
     return np.ravel( [(lambda x:1*(x>0)*((x%7)==0))(x) for x in y])
 
 
-init_globals()
+
+# #############################################################################
+# #############################################################################
+# #############################################################################
+#                         CASE CONTROL METHODS
+# #############################################################################
+# #############################################################################
+# #############################################################################
+
+def detect_and_save_rehosps_urg_30_dict(delai_rehosp=30, ano_file_path=ano_clean_file_path_2013, ano_format=ano_2013_format, rsa_file_path=rsa_clean_file_path_2013, rsa_format=rsa_2013_format, rehosps_file_path=rehosps_urg_30_delay_dict_file_path):
+    """
+    Detecte les sejours ayant donne lieu a une r-hospitalisation en urgences dans un délai de delai_rehosp jours max (après la fin) 
+    parmi les sejours et enregistre un dict {line_number:delay}.
+    Seuls les delais >0 et <= delai_rehosp sont detectes
     
-#  Test area
+    Parameters
+    ----------
+    delai_rehosps : delais maximum entre deux sejours consecutifs pour le meme patient 
+        default = 30 j
+    ano_file_path : le fichier ANO
+        defaut = ano_clean_file_path_2013
+    rsa_file_path : le fichier des RSA
+        defult = rsa_clean_file_path_2013
+    ano_format : le format des ANO
+        defult = ano_2013_format
+    rsa_format : le format des RSA
+        default = rsa_2013_format
+    rehosps_file_path : le fichier ou le dict des rehospitalisations sera enregistree
+        default = rehosps_urg_30_delay_dict_file_path
+    
+    Retruns
+    -------
+    line__delay_dict : un dict {numero de ligne dans le fichier RSA:delai}
+        Ce dict est egalement enregistree sous rehosps_file_path
+    """
+    result_dict = {}
+    line_number = 1
+    rehosps_delay_dict = {}
+    with open(ano_file_path) as ano_file:
+        with open(rsa_file_path) as rsa_file:
+            while True:
+                ano_line = ano_file.readline()
+                rsa_line = rsa_file.readline()
+                if (len(ano_line.strip())>0):
+                    ano_hash = ano_line[ano_format['ano_sp'] - 1:ano_format['ano_ep']]
+                    sej_num = int(ano_line[ano_format['sej_num_sp'] - 1:ano_format['sej_num_ep']])
+                    error, rsa_data = get_rsa_data(rsa_line, rsa_format)
+                    stay_length = rsa_data['stay_length'] 
+                    urgence = rsa_data['emergency']
+                    if (ano_hash not in result_dict):
+                        result_dict[ano_hash]=list()
+                    result_dict[ano_hash].append({'sej_num':sej_num, 'stay_length':stay_length, 'urgence':urgence, 'line_number':line_number})
+                if not ano_line:
+                    break
+                if line_number % 100000 == 0:
+                        print '\rGetting sej_num, processed ', line_number, 
+                line_number += 1
+    print 'Results dict length ' + str(len(result_dict))
+    print 'Starting rehosps detection ...'
+    line_number = 1
+    error_number = 0
+    for ano_hash_key in result_dict.keys():
+        element_list = result_dict[ano_hash_key]
+        if (len(element_list)>1):
+            element_list.sort(key=lambda x:x['sej_num'])
+            first_stay = True
+            last_sej_num = 0
+            last_stay_length = 0
+            last_line_number = 0
+            current_sej_num = 0
+            for element in element_list:
+                if (first_stay):
+                    last_sej_num = element['sej_num']
+                    last_stay_length = element['stay_length']
+                    last_line_number = element['line_number']
+                    first_stay = False
+                    continue
+                else:
+                    current_sej_num = element['sej_num']
+                    urgence = element['urgence']
+                    delay_start_to_start = current_sej_num - last_sej_num
+                    delay_end_to_start = current_sej_num - (last_sej_num + last_stay_length)
+                    if (delay_start_to_start<0):
+                        error_number += 1
+                        break
+                    if delay_start_to_start>0 and delay_end_to_start>0 and (delay_start_to_start <= delai_rehosp or delay_end_to_start <= delai_rehosp):
+                        rehosps_delay_dict[last_line_number] = [delay_start_to_start, delay_end_to_start, urgence]
+                    last_sej_num = current_sej_num
+                    last_stay_length = element['stay_length']
+                    last_line_number = element['line_number']
+        if line_number % 100000 == 0:
+                print '\rRehosp detection : processed ', line_number, 'Errors : ', error_number,
+        line_number += 1
+    with open(rehosps_file_path, 'w') as out_file:
+        pickle.dump(rehosps_delay_dict, out_file)
+    print 'Rehosps saved to ' + rehosps_file_path
+    print 'Errors ', error_number
+    return rehosps_delay_dict
+
+
+    
+# #############################################################################
+# #############################################################################
+# #############################################################################
+#                         WORK AREA
+# #############################################################################
+# #############################################################################
+# #############################################################################
+
+# #########################################
+# Iitialisation des variables globales
+
+init_globals()
     
 if False:
     # Creation et sauvegarde des referentiels
@@ -1795,6 +1930,9 @@ if False:
     rfs_df = pd.read_pickle(recusrive_bump_scores_df_file_path)
     plot_rfs_df(rfs_df)
     print_full_dataframe(rfs_df)
+    np.correlate(rfs_df['bump_score'], rfs_df['count'])
+    plt.plot(preprocessing.normalize(rfs_df['bump_score']).ravel(), preprocessing.normalize(rfs_df['count']).ravel())
+    r2 = metrics.r2_score(preprocessing.normalize(rfs_df['bump_score']).ravel(), preprocessing.normalize(rfs_df['count']).ravel())
 
     # Learning by tree algorithm
     dtc = learn_tree(X, y_sts_dummy_7, min_depth = 1, max_depth = 10)
@@ -1872,4 +2010,16 @@ if False:
     pca_0.components_ 
     pca_1.explained_variance_ratio_
     pca_0.explained_variance_ratio_ 
+    
+    
+    
+    # #########################################################################
+    #                              urg_30 study 
+    
+    # Calcul du nombre des sejours donnant lieu a une readmission en urgences dans un delais de 60 jours ou moins
+    y_next_emergency = y_ets[(X[:,short_column_label_dict['next_emergency']]==1).todense()]
+    y_next_emergency_30 = y_next_emergency[y_next_emergency<=30]
+    np.max(y_next_emergency_30)
+    np.min(y_next_emergency_30)
+    len(y_next_emergency_30)
     
