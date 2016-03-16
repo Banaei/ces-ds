@@ -1697,7 +1697,7 @@ def convert_to_is_multipe_of_7(y):
 # #############################################################################
 # #############################################################################
 
-def detect_and_save_rehosps_urg_30_dict(delai_rehosp=30, ano_file_path=ano_clean_file_path_2013, ano_format=ano_2013_format, rsa_file_path=rsa_clean_file_path_2013, rsa_format=rsa_2013_format, rehosps_file_path=rehosps_urg_30_delay_dict_file_path):
+def detect_and_save_rehosps_urg_30_dict(delai_rehosp=360, ano_file_path=ano_clean_file_path_2013, ano_format=ano_2013_format, rsa_file_path=rsa_clean_file_path_2013, rsa_format=rsa_2013_format, rehosps_file_path=rehosps_urg_30_delay_dict_file_path):
     """
     Detecte les sejours ayant donne lieu a une r-hospitalisation en urgences dans un délai de delai_rehosp jours max (après la fin) 
     parmi les sejours et enregistre un dict {line_number:delay}.
@@ -1706,7 +1706,7 @@ def detect_and_save_rehosps_urg_30_dict(delai_rehosp=30, ano_file_path=ano_clean
     Parameters
     ----------
     delai_rehosps : delais maximum entre deux sejours consecutifs pour le meme patient 
-        default = 30 j
+        default = 360 j
     ano_file_path : le fichier ANO
         defaut = ano_clean_file_path_2013
     rsa_file_path : le fichier des RSA
@@ -1720,7 +1720,8 @@ def detect_and_save_rehosps_urg_30_dict(delai_rehosp=30, ano_file_path=ano_clean
     
     Retruns
     -------
-    line__delay_dict : un dict {numero de ligne dans le fichier RSA:delai}
+    line__delay_dict : un dict {numero de ligne dans le fichier RSA:[delai (end to start), diags_related]}
+        L'element diags_related [0|1] indique si le dp ou le dr du premier sejour est egal au dp ou dr du deuxieme (4combinaisons possiles)
         Ce dict est egalement enregistree sous rehosps_file_path
     """
     result_dict = {}
@@ -1737,9 +1738,11 @@ def detect_and_save_rehosps_urg_30_dict(delai_rehosp=30, ano_file_path=ano_clean
                     error, rsa_data = get_rsa_data(rsa_line, rsa_format)
                     stay_length = rsa_data['stay_length'] 
                     urgence = rsa_data['emergency']
+                    dp = rsa_data['dp']
+                    dr = rsa_data['dr']
                     if (ano_hash not in result_dict):
                         result_dict[ano_hash]=list()
-                    result_dict[ano_hash].append({'sej_num':sej_num, 'stay_length':stay_length, 'urgence':urgence, 'line_number':line_number})
+                    result_dict[ano_hash].append({'sej_num':sej_num, 'stay_length':stay_length, 'urgence':urgence, 'line_number':line_number, 'dp':dp, 'dr':dr})
                 if not ano_line:
                     break
                 if line_number % 100000 == 0:
@@ -1748,6 +1751,7 @@ def detect_and_save_rehosps_urg_30_dict(delai_rehosp=30, ano_file_path=ano_clean
     print 'Results dict length ' + str(len(result_dict))
     print 'Starting rehosps detection ...'
     line_number = 1
+    rehosps_number = 0
     error_number = 0
     for ano_hash_key in result_dict.keys():
         element_list = result_dict[ano_hash_key]
@@ -1759,27 +1763,39 @@ def detect_and_save_rehosps_urg_30_dict(delai_rehosp=30, ano_file_path=ano_clean
             last_line_number = 0
             current_sej_num = 0
             for element in element_list:
+                diags_related = 0
                 if (first_stay):
                     last_sej_num = element['sej_num']
                     last_stay_length = element['stay_length']
                     last_line_number = element['line_number']
+                    last_dp = element['dp']
+                    last_dr = element['dr']
                     first_stay = False
                     continue
                 else:
-                    current_sej_num = element['sej_num']
                     urgence = element['urgence']
-                    delay_start_to_start = current_sej_num - last_sej_num
+                    if (urgence!=1):
+                        # Ne prend en compte que les readmissions en urgences
+                        continue
+                    current_sej_num = element['sej_num']
+                    current_dp = element['dp']
+                    current_dr = element['dr']
                     delay_end_to_start = current_sej_num - (last_sej_num + last_stay_length)
-                    if (delay_start_to_start<0):
+                    if (delay_end_to_start<0):
                         error_number += 1
                         break
-                    if delay_start_to_start>0 and delay_end_to_start>0 and (delay_start_to_start <= delai_rehosp or delay_end_to_start <= delai_rehosp):
-                        rehosps_delay_dict[last_line_number] = [delay_start_to_start, delay_end_to_start, urgence]
+                    if delay_end_to_start>0 and delay_end_to_start <= delai_rehosp:
+                        if (last_dp==current_dp or last_dp==current_dr or last_dr==current_dp or last_dr==current_dr):
+                            diags_related = 1
+                        rehosps_delay_dict[last_line_number] = [delay_end_to_start, diags_related]
+                        rehosps_number += 1
                     last_sej_num = current_sej_num
                     last_stay_length = element['stay_length']
                     last_line_number = element['line_number']
+                    last_dp = element['dp']
+                    last_dr = element['dr']
         if line_number % 100000 == 0:
-                print '\rRehosp detection : processed ', line_number, 'Errors : ', error_number,
+                print '\rRehosp detection : processed ', line_number, 'Errors : ', error_number, 'rehosps taken : ', rehosps_number,
         line_number += 1
     with open(rehosps_file_path, 'w') as out_file:
         pickle.dump(rehosps_delay_dict, out_file)
@@ -2023,3 +2039,4 @@ if False:
     np.min(y_next_emergency_30)
     len(y_next_emergency_30)
     
+    detect_and_save_rehosps_urg_30_dict
