@@ -24,6 +24,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn import metrics
 from sklearn import preprocessing
 from sklearn.feature_selection import chi2, f_classif
+import random as rnd
 
 imp.reload(file_paths)
 
@@ -1987,7 +1988,6 @@ def create_and_save_rsas_rehosps_urg_X_y(rehosps_dict, rsas_file_path=rsa_clean_
         
     Y : array contenant le delais de reospitalisation
     '''
-    global short_column_label_dict
     line_number = 1
     i = 0
     rows_count = len(rehosps_dict)
@@ -2015,6 +2015,55 @@ def create_and_save_rsas_rehosps_urg_X_y(rehosps_dict, rsas_file_path=rsa_clean_
     save_sparse(X_out_file_path, X)
     np.savez_compressed(y_out_file_path, y_delay=y_delay, y_diags_related=y_diags_related)
     return X, y_delay, y_diags_related    
+
+
+
+
+def create_and_save_control_rsas_rehosps_urg_X(line_numbers_dict, rsas_file_path=rsa_clean_file_path_2013, rsa_format=rsa_2013_format, X_out_file_path=X_rehosps_urg_controls_file_path):
+    '''
+    This method parses the lines of the file rsas_file_path and takes only those whose line_number (starting from 1) are 
+    included in line_numbers_dict 
+    
+    Parameters
+    ----------
+    reshosps_dict : {line_number:1}
+    
+    rsas_file_path : RSA file
+        default : rsa_clean_file_path_2013
+    rsa_format : RSA format
+        default : rsa_2013_format
+    X_out_file_path : fichier de sauvegarde de X
+        default : X_rehosps_urg_controls_file_path
+        
+    Returns
+    -------
+    X : saprse CSR matrix containing len(cld) columns (features)
+        
+    '''
+    line_number = 1
+    i = 0
+    rows_count = len(line_numbers_dict)
+    cols_count = len(urg_column_label_dict)
+    sparse_X = sparse.lil_matrix((rows_count, cols_count))
+
+    with open(rsas_file_path) as rsa_file:
+        while True:
+            rsa_line = rsa_file.readline().strip()
+            if (line_number in line_numbers_dict):
+                error, rsa_data_dict = get_rsa_data(rsa_line, rsa_format)
+                rsa_to_X_urg(rsa_data_dict, sparse_X, i)
+                i += 1
+            line_number += 1
+            if line_number % 10000 == 0:
+                print '\rLines processed ', line_number, ', % processed ', (i*100/rows_count),
+            if (not rsa_line):
+                break
+
+    X = sparse_X.tocsr()
+    save_sparse(X_out_file_path, X)
+    return X    
+
+
 
 def plot_rehosps_delay_urg(rehosp_delay_array, y_diags_related):
     """
@@ -2072,7 +2121,58 @@ def get_lines_count_of_file(file_path):
                 break
     return i
             
-     
+def get_dict_line_numbers_case_urg(rehosps_urg_dict):
+    '''
+    Cette methode prend en entree le dict calcule par la methode detect_and_save_rehosps_urg_dict et donne les numeros des lignes ou
+    les dr ou dp de la rehosp = dr ou dp du sejour.
+    Le format du dict est le suivant {numero de ligne:[delai de rehospit, diags en rapport]}
+    Le numero de ligne est celui du fichir RSA pour le sejour A
+    delai de rehospit est le nombre de jours entre la fin du sejour A et le debut du sejour B
+    diags en rapport (0 ou 1) indique si les dp ou dr du sejour B se trouvent parmi les dp et dr du sejour A
+    
+    Paremeters
+    ----------
+    rehosps_urg_dict : dict de format {numero de ligne:[delai de rehospit, diags en rapport]}
+    
+    Returns
+    -------
+    un dict dont les cles sont les numeros des lignes du fichier RSA 
+    '''
+    response = {}
+    i = 0
+    for line_number in rehosps_urg_dict:
+        if (rehosps_urg_dict[line_number][1]==1):
+            response[line_number] = 1
+            i += 1
+    print str(i), 'lines added'
+    return response
+    
+
+def random_select_controls_line_numbers(total_lines_count, cases_line_numbers_dict, control_to_case_ratio = 6):
+    '''
+    Selectionne aleatoirement des numeros de lignes parmi un total de total_lines_count, en excluant les lignes correspondant aux "cases".
+
+    Parameters
+    ----------
+    
+    total_lines_count : Nombre total des lignes du fichier de donnees
+    
+    cases_line_numbers_dict : dict des numeros de lignes correspondant aux cases. Ce dict est de format {numero de ligne : 1}
+    
+    control_to_case_ratio : le ratio des controles aux cas.
+        default : 6
+    
+    '''
+    lines_not_case_list = list()
+    for l in range(1, total_lines_count+1):
+        if not l in cases_line_numbers_dict:
+            lines_not_case_list.append(l)
+    sample_size = control_to_case_ratio * len(cases_line_numbers_dict)
+    control_lines_list = rnd.sample(lines_not_case_list, sample_size)
+    response_dict = {}
+    for l in control_lines_list:
+        response_dict[l]=1
+    return response_dict
 
     
 # #############################################################################
@@ -2343,16 +2443,31 @@ if False:
     # Distribution des delais pour les rehospits diagns en rapport et sans rapport
     plot_rehosps_delay_urg(y_urg_delay, y_urg_diags_related)
     
-    # Separation des X_urg pour lesquels le diag est en rapport (X_urg_diags_realted)
-    X_urg_diags_realted = X_urg[(y_urg_diags_related==1).ravel(),:]
+    # Separation des X_urg pour lesquels le diag est en rapport (X_urg_diags_realted) : les cas dans notre etude cas-temoin
+    X_urg_cases = X_urg[(y_urg_diags_related==1).ravel(),:]
     
-    # Sauvegarde des X_urg_diags_realted
-    save_sparse(X_rehosps_urg_diags_related_sparse_file_path,X_urg_diags_realted)
+    # Sauvegarde des X_urg_cases
+    save_sparse(X_rehosps_urg_cases_file_path,X_urg_cases)
+    
+    # Load de la matrice éparse X_urgcases
+    X_urg_cases = load_sparse(X_rehosps_urg_cases_file_path)
 
     # Les delais de rehospit pour les diags en rapport
-    y_urg_delay_diags_realted = y_urg_delay[y_urg_diags_related==1]
+    y_urg_cases_rehosp_delay = y_urg_delay[y_urg_diags_related==1]
     
     # Nombre total des RSA eligibles en 2013
     # total_rsa_count_2013 = get_lines_count_of_file(rsa_clean_file_path_2013)
     total_rsa_count_2013 = 17113724
+    
+    # Les numeros des lignes du fichier RSA qui sont des "cases", utilise (pour exclusion) pour selectionner les temoins 
+    cases_line_numbers_dict = get_dict_line_numbers_case_urg(rehosps_urg_dict)    
+    
+    # Les numeros des lignes des controls selectionnes aleatoirement
+    controls_line_numbers_dict = random_select_controls_line_numbers(total_rsa_count_2013, cases_line_numbers_dict)
+    
+    X_urg_controls = create_and_save_control_rsas_rehosps_urg_X(controls_line_numbers_dict)
+    
+    
+    
+    
     
