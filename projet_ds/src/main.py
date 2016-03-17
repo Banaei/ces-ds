@@ -9,22 +9,25 @@ import file_paths
 import formats
 from file_paths import *
 from formats import *
+import sys
+
+import os
+import imp
 import pickle
+import random as rnd
 import numpy as np
 import matplotlib.pyplot as plt
-import imp
-from scipy import sparse
-from sklearn.feature_selection import RFE
-from sklearn.linear_model import LogisticRegression
 import pandas as pd
-from sklearn.tree import DecisionTreeClassifier
+from sklearn.linear_model import LogisticRegression
 from sklearn import tree
-import os
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.feature_selection import RFE
 from sklearn.linear_model import LogisticRegression
 from sklearn import metrics
 from sklearn import preprocessing
 from sklearn.feature_selection import chi2, f_classif
-import random as rnd
+from sklearn.ensemble import AdaBoostClassifier
+from scipy import sparse, vstack
 
 imp.reload(file_paths)
 
@@ -1828,15 +1831,15 @@ def detect_and_save_rehosps_urg_dict(delai_rehosp=360, ano_file_path=ano_clean_f
                     error, rsa_data = get_rsa_data(rsa_line, rsa_format)
                     stay_length = rsa_data['stay_length'] 
                     urgence = rsa_data['emergency']
-                    dp = rsa_data['dp']
-                    dr = rsa_data['dr']
+                    chapitre_dp = rsa_data['chapitre_dp']
+                    chapitre_dr = rsa_data['chapitre_dr']
                     if (ano_hash not in result_dict):
                         result_dict[ano_hash]=list()
-                    result_dict[ano_hash].append({'sej_num':sej_num, 'stay_length':stay_length, 'urgence':urgence, 'line_number':line_number, 'dp':dp, 'dr':dr})
+                    result_dict[ano_hash].append({'sej_num':sej_num, 'stay_length':stay_length, 'urgence':urgence, 'line_number':line_number, 'chapitre_dp':chapitre_dp, 'chapitre_dr':chapitre_dr})
                 if not ano_line:
                     break
                 if line_number % 100000 == 0:
-                        print '\rGetting sej_num, processed ', line_number, 
+                        print '\rGetting sej_num, processed ', line_number, 'memory size of result_dict=', str(sys.getsizeof(result_dict))
                 line_number += 1
     print 'Results dict length ' + str(len(result_dict))
     print 'Starting rehosps detection ...'
@@ -1858,15 +1861,15 @@ def detect_and_save_rehosps_urg_dict(delai_rehosp=360, ano_file_path=ano_clean_f
                     last_sej_num = element['sej_num']
                     last_stay_length = element['stay_length']
                     last_line_number = element['line_number']
-                    last_dp_racine = element['dp'][0:3]
-                    last_dr_racine = element['dr'][0:3]
+                    last_dp_racine = element['chapitre_dp']
+                    last_dr_racine = element['chapitre_dr']
                     first_stay = False
                     continue
                 else:
                     urgence = element['urgence']
                     current_sej_num = element['sej_num']
-                    current_dp_racine = element['dp'][0:3]
-                    current_dr_racine = element['dr'][0:3]
+                    current_dp_racine = element['chapitre_dp']
+                    current_dr_racine = element['chapitre_dr']
                     delay_end_to_start = current_sej_num - (last_sej_num + last_stay_length)
                     if (delay_end_to_start<0):
                         error_number += 1
@@ -1881,8 +1884,8 @@ def detect_and_save_rehosps_urg_dict(delai_rehosp=360, ano_file_path=ano_clean_f
                     last_sej_num = current_sej_num
                     last_stay_length = element['stay_length']
                     last_line_number = element['line_number']
-                    last_dp_racine = element['dp'][0:3]
-                    last_dr_racine = element['dr'][0:3]
+                    last_dp_racine = element['chapitre_dp']
+                    last_dr_racine = element['chapitre_dr']
         if line_number % 100000 == 0:
                 print '\rRehosp detection : processed ', line_number, 'Errors : ', error_number, 'rehosps taken : ', rehosps_number,
         line_number += 1
@@ -2019,14 +2022,16 @@ def create_and_save_rsas_rehosps_urg_X_y(rehosps_dict, rsas_file_path=rsa_clean_
 
 
 
-def create_and_save_control_rsas_rehosps_urg_X(line_numbers_dict, rsas_file_path=rsa_clean_file_path_2013, rsa_format=rsa_2013_format, X_out_file_path=X_rehosps_urg_controls_file_path):
+def create_and_save_control_rsas_rehosps_urg_X(total_rsa_count, rehosps_urg_dict, rsas_file_path=rsa_clean_file_path_2013, rsa_format=rsa_2013_format, X_out_file_path=X_rehosps_urg_controls_file_path):
     '''
     This method parses the lines of the file rsas_file_path and takes only those whose line_number (starting from 1) are 
     included in line_numbers_dict 
     
     Parameters
     ----------
-    reshosps_dict : {line_number:1}
+    total_rsa_count_2013 : nombre total de rsas
+    
+    rehosps_urg_dict : {numero de ligne dans le fichier RSA:[delai (end to start), diags_related]}
     
     rsas_file_path : RSA file
         default : rsa_clean_file_path_2013
@@ -2040,6 +2045,8 @@ def create_and_save_control_rsas_rehosps_urg_X(line_numbers_dict, rsas_file_path
     X : saprse CSR matrix containing len(cld) columns (features)
         
     '''
+    cases_line_numbers_dict = get_dict_line_numbers_case_urg(rehosps_urg_dict)    
+    line_numbers_dict = random_select_controls_line_numbers(total_rsa_count, cases_line_numbers_dict)
     line_number = 1
     i = 0
     rows_count = len(line_numbers_dict)
@@ -2098,28 +2105,28 @@ def plot_rehosps_delay_urg(rehosp_delay_array, y_diags_related):
     plt.show()   
 
 
-def get_lines_count_of_file(file_path):
-    """
-    Renvoie le nombre de lignes d'un fichier text
-    
-    Parametres
-    ----------
-    file_path : le fichier text
-    
-    Returns
-    -------
-    Le nombre de lignes du fichier donne en entree
-    """
-    with open(file_path) as f:
-        i = 1
-        while True:
-            line = f.readline()
-            i += 1
-            if i % 100000 ==0:
-                print '\rProcessed ', str(i),
-            if not line:
-                break
-    return i
+#def get_lines_count_of_file(file_path):
+#    """
+#    Renvoie le nombre de lignes d'un fichier text
+#    
+#    Parametres
+#    ----------
+#    file_path : le fichier text
+#    
+#    Returns
+#    -------
+#    Le nombre de lignes du fichier donne en entree
+#    """
+#    with open(file_path) as f:
+#        i = 1
+#        while True:
+#            line = f.readline()
+#            i += 1
+#            if i % 100000 ==0:
+#                print '\rProcessed ', str(i),
+#            if not line:
+#                break
+#    return i
             
 def get_dict_line_numbers_case_urg(rehosps_urg_dict):
     '''
@@ -2173,6 +2180,46 @@ def random_select_controls_line_numbers(total_lines_count, cases_line_numbers_di
     for l in control_lines_list:
         response_dict[l]=1
     return response_dict
+
+
+def load_urg_X_y_case_control_as_dataframe():
+    '''
+    Lis la matrice eparse X et les delais de rehosp y du case-control des urgences sur le disque
+    et renvoie un DataFrame et un vecteur des labels (0/1)
+    
+    Returns
+    -------
+    
+    DataFrame contenant la Data 
+    Un vecteur de labels (0/1) pour réhospitalisation oui ou non
+    '''
+    
+
+    X_urg_case_control = load_sparse(X_rehosps_urg_case_controls_file_path)
+    y_delay_case_controls = np.load(y_rehosps_urg_path)['y_delay_case_controls']
+    col_names = ['']*len(urg_column_label_dict)
+    for key in urg_column_label_dict:
+        urg_column_label_dict[urg_column_label_dict[key]]=key
+    df = pd.DataFrame(X_urg_case_control.todense(), columns=col_names)
+    y_rehosp_case_controls = 1*(y_delay_case_controls>0)
+    return df, y_rehosp_case_controls
+    
+def load_urg_X_y_case_control_as_sparce_and_vector():
+    '''
+    Lis la matrice eparse X et les delais de rehosp y du case-control des urgences sur le disque
+    et les renvoie
+    
+    Returns
+    -------
+    
+    La matrice eparse la Data 
+    Un vecteur de labels (0/1) pour réhospitalisation oui ou non
+    '''
+    
+    X_urg_case_control = load_sparse(X_rehosps_urg_case_controls_file_path)
+    y_delay_case_controls = np.load(y_rehosps_urg_case_controls_file_path)['y_delay']
+    y_rehosp_case_controls = 1*(y_delay_case_controls>0)
+    return X_urg_case_control, y_rehosp_case_controls
 
     
 # #############################################################################
@@ -2419,6 +2466,9 @@ if False:
 
     # Etude des urgences
 
+    # ###########################################
+    #        Preparation des donnees
+
     # Detection des rehopits en urgence
     rehosps_urg_dict = detect_and_save_rehosps_urg_dict()
     
@@ -2435,10 +2485,14 @@ if False:
     
     '''
     Pour 2013
-    Nombre total des rehosps en urgence = 72349
-    Nombre total des rehosps avec dp ou dr = dp ou dr du sejour precedent = 68101
+    Nombre de sejours : 17113724
+    Nombre de patients differents : 11518864
+    Nombre total des rehosps en urgence = 72349 (len(y_urg_delay))
+    Nombre total des rehosps avec dp ou dr = dp ou dr du sejour precedent = 68101 (np.sum((y_urg_diags_related)))
     Rapport entre les deux = 94.12 %
     '''
+    
+    
     
     # Distribution des delais pour les rehospits diagns en rapport et sans rapport
     plot_rehosps_delay_urg(y_urg_delay, y_urg_diags_related)
@@ -2451,23 +2505,88 @@ if False:
     
     # Load de la matrice éparse X_urgcases
     X_urg_cases = load_sparse(X_rehosps_urg_cases_file_path)
+    X_urg_cases.shape
 
     # Les delais de rehospit pour les diags en rapport
     y_urg_cases_rehosp_delay = y_urg_delay[y_urg_diags_related==1]
+    y_urg_cases_rehosp_delay = np.reshape(y_urg_cases_rehosp_delay, (len(y_urg_cases_rehosp_delay),1))
+    y_urg_cases_rehosp_delay.shape
     
     # Nombre total des RSA eligibles en 2013
-    # total_rsa_count_2013 = get_lines_count_of_file(rsa_clean_file_path_2013)
+    # total_rsa_count_2013 = count_lines_of_the_file(rsa_clean_file_path_2013)
     total_rsa_count_2013 = 17113724
+        
+    # Creation et sauvegarde des controles
+    X_urg_controls = create_and_save_control_rsas_rehosps_urg_X(total_rsa_count_2013, rehosps_urg_dict)
     
-    # Les numeros des lignes du fichier RSA qui sont des "cases", utilise (pour exclusion) pour selectionner les temoins 
-    cases_line_numbers_dict = get_dict_line_numbers_case_urg(rehosps_urg_dict)    
+    # Fusion des matrices cas et control
+    X_urg_case_control = sparse.vstack([X_urg_cases, X_urg_controls])
     
-    # Les numeros des lignes des controls selectionnes aleatoirement
-    controls_line_numbers_dict = random_select_controls_line_numbers(total_rsa_count_2013, cases_line_numbers_dict)
+    # Fusion dess y_urg_delay (cases) et un vecteur de zeros de mme taille que les controls
+    y_delay_case_controls = np.vstack([y_urg_cases_rehosp_delay, np.zeros((X_urg_controls.shape[0],1))])
     
-    X_urg_controls = create_and_save_control_rsas_rehosps_urg_X(controls_line_numbers_dict)
+    # Verification des tailles
+    X_urg_case_control.shape
+    y_delay_case_controls.shape
+    
+    # Melange des matrices
+    permutated_indexes = np.random.permutation(len(y_delay_case_controls))
+    X_urg_case_control = X_urg_case_control[permutated_indexes, :]
+    y_delay_case_controls = y_delay_case_controls[permutated_indexes,:]
+    
+    # Reverification des tailles
+    X_urg_case_control.shape
+    y_delay_case_controls.shape
     
     
+    # Sauvegarde des matrices case-control
+    save_sparse(X_rehosps_urg_case_controls_file_path, X_urg_case_control)
+    np.savez_compressed(y_rehosps_urg_case_controls_file_path, y_delay=y_delay_case_controls)
+    
+
+
+    #   Fin des preparations des donnees
+    # ###########################################
+
+    # ###########################################
+    #     Utilisation des donnees
+    
+    # Recuperation des matrices case-control
+    X_urg_case_controls = load_sparse(X_rehosps_urg_case_controls_file_path)
+    y_delay_case_controls = np.load(y_rehosps_urg_case_controls_file_path)['y_delay']
+    
+    X_urg_case_controls.shape
+    y_delay_case_controls.shape
+    
+    # Labels 0=par de rehosp en urgences, 1=rehosp en urgence avec dp ou dr egaux entre les deux sejours
+    y_rehosp_case_controls = 1*(y_delay_case_controls>0)
+    
+    
+    # ###########################################
+    #        Apprentissage
+    
+    X_urg_case_control, y_rehosp_case_controls = load_urg_X_y_case_control_as_sparce_and_vector()
+    X_urg_case_control.shape
+    y_rehosp_case_controls.shape
+    
+    # Learning by LR algorithm
+    lr_l1 = LogisticRegression(penalty='l1', verbose=1)
+    lr_l1.fit(X_urg_case_control, y_rehosp_case_controls)
+    y_p_l1 = lr_l1.predict(X_urg_case_control)
+    print(metrics.confusion_matrix (y_rehosp_case_controls,y_p_l1))
+    print (metrics.classification_report(y_rehosp_case_controls, y_p_l1))    
+
+    lr_l2 = LogisticRegression(penalty='l2', verbose=1)
+    lr_l2.fit(X_urg_case_control, y_rehosp_case_controls)
+    y_p_l2 = lr_l2.predict(X_urg_case_control)
+    print(metrics.confusion_matrix (y_rehosp_case_controls,y_p_l2))
+    print (metrics.classification_report(y_rehosp_case_controls, y_p_l2))    
+    
+    model = AdaBoostClassifier()
+    model.fit(X_urg_case_control, y_rehosp_case_controls)
+    y_p_adaboost = model.predict(X_urg_case_control)
+    print(metrics.confusion_matrix (y_rehosp_case_controls,y_p_adaboost))
+    print (metrics.classification_report(y_rehosp_case_controls, y_p_adaboost))    
     
     
     
