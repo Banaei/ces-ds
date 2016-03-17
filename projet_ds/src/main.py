@@ -2015,6 +2015,65 @@ def create_and_save_rsas_rehosps_urg_X_y(rehosps_dict, rsas_file_path=rsa_clean_
     save_sparse(X_out_file_path, X)
     np.savez_compressed(y_out_file_path, y_delay=y_delay, y_diags_related=y_diags_related)
     return X, y_delay, y_diags_related    
+
+def plot_rehosps_delay_urg(rehosp_delay_array, y_diags_related):
+    """
+    Trace les courbes de la repartition des delais de re-hospitalisation pour les readmissions en urgences. Deux
+    courbes sont tracees : une pour les readmissions dont le dp ou le dr est le meme que le dp ou le dr du sejour precedent,
+    l'autre sans rapport
+    En X : le delai
+    En Y : le nombre de rehops
+    
+    Parameters
+    ----------
+    rehosp_delay_array : Array de delai de rehospitalisation
+    
+    y_diags_related : array de 0 ou 1 indiquant si la readmission a le meme dp ou dr
+    
+    """
+    freq_delay_diag_related = np.zeros(366, dtype=int)
+    freq_delay_diag_not_related = np.zeros(366, dtype=int)
+    rehosps_diag_related = rehosp_delay_array[y_diags_related==1]
+    rehosps_diag_not_related = rehosp_delay_array[y_diags_related==0]
+    for i in range(0, 366):
+        freq_delay_diag_related[i] = np.sum(rehosps_diag_related==i)
+        freq_delay_diag_not_related[i] = np.sum(rehosps_diag_not_related==i)
+        
+    X = np.asarray(range(0,366))
+    plt.plot(X,freq_delay_diag_related[X], 'b-', label='Diagnostic en rapport')
+    plt.plot(X,freq_delay_diag_not_related[X], 'r-', label='Diagnostic sans rapport')
+    plt.title('Delais de rehospitalisation en urgences en 2013')
+    plt.xlabel('Delai entre deux hospitalisation en jours')
+    plt.ylabel('Nombre de sejours')
+    plt.legend(loc="best")
+    plt.show()   
+
+
+def get_lines_count_of_file(file_path):
+    """
+    Renvoie le nombre de lignes d'un fichier text
+    
+    Parametres
+    ----------
+    file_path : le fichier text
+    
+    Returns
+    -------
+    Le nombre de lignes du fichier donne en entree
+    """
+    with open(file_path) as f:
+        i = 1
+        while True:
+            line = f.readline()
+            i += 1
+            if i % 100000 ==0:
+                print '\rProcessed ', str(i),
+            if not line:
+                break
+    return i
+            
+     
+
     
 # #############################################################################
 # #############################################################################
@@ -2243,18 +2302,57 @@ if False:
     
     # #########################################################################
     #                              urg_30 study 
+
+    # Creation et sauvegarde des referentiels
+    create_and_save_global_refs() 
+    
+    urg_column_label_dict
     
     # Calcul du nombre des sejours donnant lieu a une readmission en urgences dans un delais de 60 jours ou moins
+    # utilise les donnees de la partie precedente
     y_next_emergency = y_ets[(X[:,short_column_label_dict['next_emergency']]==1).todense()]
     y_next_emergency_30 = y_next_emergency[y_next_emergency<=30]
     np.max(y_next_emergency_30)
     np.min(y_next_emergency_30)
     len(y_next_emergency_30)
-    
+
+
+    # Etude des urgences
+
+    # Detection des rehopits en urgence
     rehosps_urg_dict = detect_and_save_rehosps_urg_dict()
+    
+    # Load des rehospits en urgence
     rehosps_urg_dict = load_picke(rehosps_urg_30_delay_dict_file_path)
+    
+    # Creation de la matrix eparse X et des reponses delay et diags en rapport
     X_urg, y_urg_delay, y_urg_diags_related = create_and_save_rsas_rehosps_urg_X_y(rehosps_urg_dict)
+    
+    # Load de la matrice eparse et des y delai et diags en rapport
     X_urg = load_sparse(X_rehosps_urg_sparse_file_path)
     y_urg_delay = np.load(y_rehosps_urg_path)['y_delay']
     y_urg_diags_related = np.load(y_rehosps_urg_path)['y_diags_related']
+    
+    '''
+    Pour 2013
+    Nombre total des rehosps en urgence = 72349
+    Nombre total des rehosps avec dp ou dr = dp ou dr du sejour precedent = 68101
+    Rapport entre les deux = 94.12 %
+    '''
+    
+    # Distribution des delais pour les rehospits diagns en rapport et sans rapport
+    plot_rehosps_delay_urg(y_urg_delay, y_urg_diags_related)
+    
+    # Separation des X_urg pour lesquels le diag est en rapport (X_urg_diags_realted)
+    X_urg_diags_realted = X_urg[(y_urg_diags_related==1).ravel(),:]
+    
+    # Sauvegarde des X_urg_diags_realted
+    save_sparse(X_rehosps_urg_diags_related_sparse_file_path,X_urg_diags_realted)
+
+    # Les delais de rehospit pour les diags en rapport
+    y_urg_delay_diags_realted = y_urg_delay[y_urg_diags_related==1]
+    
+    # Nombre total des RSA eligibles en 2013
+    # total_rsa_count_2013 = get_lines_count_of_file(rsa_clean_file_path_2013)
+    total_rsa_count_2013 = 17113724
     
