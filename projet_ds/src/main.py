@@ -27,6 +27,7 @@ from sklearn import metrics
 from sklearn import preprocessing
 from sklearn.feature_selection import chi2, f_classif
 from sklearn.ensemble import AdaBoostClassifier
+from sklearn.ensemble import RandomForestClassifier
 from scipy import sparse, vstack
 
 imp.reload(file_paths)
@@ -38,6 +39,7 @@ urg_column_label_dict = {}
 codes_um_urgences_dict = {}
 ipe_prive_dict = {}
 short_column_label_list = list()    
+short_column_label_list_not_sorted = list()
     
 def add_column_labels_from_file_to_dict(codes_file_path, the_dict, suffix):
     """
@@ -246,6 +248,7 @@ def init_globals():
     global codes_um_urgences_dict
     global ipe_prive_dict
     global short_column_label_list
+    global short_column_label_list_not_sorted
     
     
     full_column_label_dict = load_full_column_labels()
@@ -255,12 +258,15 @@ def init_globals():
     ipe_prive_dict = load_ipe_private_dict()
     
     short_column_labels_indexes_dict = {}
+    short_column_label_list_not_sorted = len(short_column_label_dict)*['']
     for key in short_column_label_dict:
         index = short_column_label_dict[key]
         short_column_labels_indexes_dict[index] = key
+        short_column_label_list_not_sorted[index] = key
     for i in range(len(short_column_labels_indexes_dict)):
         short_column_label_list.append(short_column_labels_indexes_dict[i])
     short_column_label_list.sort()
+    
 
     
 def save_sparse(filename, array):
@@ -482,7 +488,6 @@ def get_rsa_data(rsa, rsa_format, verbose=None):
         un tuple contenant :
             -error : boolean. True s'il y a eu une erreur dans le RSA
             -un dict du format :
-                'index':index du RSA. Sans interet veritale
                 'racine_ghm' : CMD + Typ
                 'cmd': cateorie majeur de diagnostic
                 'type_ghm': type du groupe homogene de malade (GHM),
@@ -646,7 +651,6 @@ def get_rsa_data(rsa, rsa_format, verbose=None):
         first_act_sp += zone_acte_length
         
     return error, {
-        'index':index,
         'age':age,
         'stay_length':stay_length,
         'cmd':cmd,
@@ -1497,7 +1501,7 @@ def get_features_bump_scores_as_df(X_param, y_param, cll=short_column_label_list
     
 
 
-def learn_tree(X_data, Y_data, criterion='gini', min_depth = 1, max_depth = 3, dtc_fp=dtc_file_path, dot_fp = tree_dot_file_path, pdf_fp=tree_pdf_file_path):
+def learn_tree(X_data, Y_data, col_names_dict=short_column_label_dict , criterion='gini', min_depth = 1, max_depth = 3, dtc_fp=dtc_file_path, dot_fp = tree_dot_file_path, pdf_fp=tree_pdf_file_path):
     """
     Classification par arbre
     
@@ -1539,7 +1543,7 @@ def learn_tree(X_data, Y_data, criterion='gini', min_depth = 1, max_depth = 3, d
     with open(dtc_fp, 'w') as f:
         pickle.dump(dtc, f)
 
-    col_names = ['']*len(short_column_label_dict)
+    col_names = ['']*len(col_names_dict)
     for key in short_column_label_dict:
         col_names[short_column_label_dict[key]]=key
 
@@ -2072,7 +2076,7 @@ def create_and_save_control_rsas_rehosps_urg_X(total_rsa_count, rehosps_urg_dict
 
 
 
-def plot_rehosps_delay_urg(rehosp_delay_array, y_diags_related):
+def plot_rehosps_delay_urg(rehosp_delay_array, y_diags_related, include_diags_no_related=True):
     """
     Trace les courbes de la repartition des delais de re-hospitalisation pour les readmissions en urgences. Deux
     courbes sont tracees : une pour les readmissions dont le dp ou le dr est le meme que le dp ou le dr du sejour precedent,
@@ -2097,12 +2101,15 @@ def plot_rehosps_delay_urg(rehosp_delay_array, y_diags_related):
         
     X = np.asarray(range(0,366))
     plt.plot(X,freq_delay_diag_related[X], 'b-', label='Diagnostic en rapport')
-    plt.plot(X,freq_delay_diag_not_related[X], 'r-', label='Diagnostic sans rapport')
+    if (include_diags_no_related):
+        plt.plot(X,freq_delay_diag_not_related[X], 'r-', label='Diagnostic sans rapport')
     plt.title('Delais de rehospitalisation en urgences en 2013')
     plt.xlabel('Delai entre deux hospitalisation en jours')
     plt.ylabel('Nombre de sejours')
     plt.legend(loc="best")
     plt.show()   
+
+
 
 
 #def get_lines_count_of_file(file_path):
@@ -2151,7 +2158,6 @@ def get_dict_line_numbers_case_urg(rehosps_urg_dict):
         if (rehosps_urg_dict[line_number][1]==1):
             response[line_number] = 1
             i += 1
-    print str(i), 'lines added'
     return response
     
 
@@ -2220,6 +2226,108 @@ def load_urg_X_y_case_control_as_sparce_and_vector():
     y_delay_case_controls = np.load(y_rehosps_urg_case_controls_file_path)['y_delay']
     y_rehosp_case_controls = 1*(y_delay_case_controls>0)
     return X_urg_case_control, y_rehosp_case_controls
+
+
+
+def create_clean_urg_case_control_data(rehosps_urg_dict, X_urg, y_urg_delay, y_urg_diags_related):
+    
+    '''
+    Returns
+    -------
+    X_urg_case_control
+    y_delay_case_controls
+    actual_cols_list
+    '''
+    
+    # Separation des X_urg pour lesquels le diag est en rapport (X_urg_diags_realted) : les cas dans notre etude cas-temoin
+    X_urg_cases = X_urg[(y_urg_diags_related==1).ravel(),:]
+    print 'Diag related cases separated'
+    
+    # Les delais de rehospit pour les diags en rapport
+    y_urg_cases_rehosp_delay = y_urg_delay[y_urg_diags_related==1]
+    y_urg_cases_rehosp_delay = np.reshape(y_urg_cases_rehosp_delay, (len(y_urg_cases_rehosp_delay),1))
+    print 'Diag related labels separated'
+
+    # Nombre total des RSA eligibles en 2013
+    # total_rsa_count_2013 = count_lines_of_the_file(rsa_clean_file_path_2013)
+    total_rsa_count_2013 = 17113724
+
+    # Creation et sauvegarde des controles
+    print 'Randomly selecting contols ...'
+    X_urg_controls = create_and_save_control_rsas_rehosps_urg_X(total_rsa_count_2013, rehosps_urg_dict)
+    print str(X_urg_controls.shape[0]), 'Contols selected.'
+    
+    # Fusion des matrices cas et control
+    X_urg_case_control = sparse.vstack([X_urg_cases, X_urg_controls])
+    print 'Case-Control data matrix made with shape ', X_urg_case_control.shape
+    
+    # Fusion dess y_urg_delay (cases) et un vecteur de zeros de mme taille que les controls
+    y_delay_case_controls = np.vstack([y_urg_cases_rehosp_delay, np.zeros((X_urg_controls.shape[0],1))])
+    print 'Case-Control delay vector made with shape ', y_delay_case_controls.shape
+
+    # Verification des tailles
+    if (X_urg_case_control.shape[0] != y_delay_case_controls.shape[0]):
+        raise Exception("Data and labels don't have the same size !")
+
+    print 'Deleting null columns ...'
+    s = np.sum(X_urg_case_control.todense(), axis=0)
+    s = np.array(s).ravel()
+    print str(np.sum(1*(s==0))), ' null columns detected'
+    s = (s!=0)
+    
+    all_col_names_list = len(urg_column_label_dict)*['']
+    actual_cols_list = list()
+    for key in urg_column_label_dict:
+        all_col_names_list[urg_column_label_dict[key]] = key
+    
+    for i in range(len(urg_column_label_dict)):
+        if s[i]:
+            actual_cols_list.append(all_col_names_list[i])
+    print 'features reduced from ', str(len(all_col_names_list)), ' to ', str(len(actual_cols_list))
+        
+    X_urg_case_control = X_urg_case_control[:,s!=0]
+    print 'Cols deleted from data matrix. The new shape is ', X_urg_case_control.shape
+
+    save_sparse(X_rehosps_urg_case_controls_file_path, X_urg_case_control)
+    print 'Data matrix saved to X_rehosps_urg_case_controls_file_path : ', X_rehosps_urg_case_controls_file_path    
+    
+    np.savez_compressed(y_rehosps_urg_case_controls_file_path, y_delay=y_delay_case_controls)
+    print 'Delays vector saved to y_rehosps_urg_case_controls_file_path : ', y_rehosps_urg_case_controls_file_path     
+    
+    with open(actual_column_label_urg_list_file_path, 'w') as f:
+        pickle.dump(actual_cols_list, f)
+
+    print 'New cols dict saved to actual_column_label_urg_list_file_path : ', actual_column_label_urg_list_file_path
+    
+    return X_urg_case_control, y_delay_case_controls, actual_cols_list
+
+
+def get_X_with_important_features(X_data, col_names, feature_importance_array):
+    '''
+    Purge les donnees en supprimant les colonnes dont l'importance est 0.
+    
+    Parameters
+    ----------
+    X_data : matrice des donnees
+    
+    col_names : liste des noms des colonnes
+    
+    feature_importance_array : Array qui donn el'importance des features
+    
+    Returns
+    -------
+    
+    La matrice epuree des colonnes dont l'importance =0
+    
+    Nouvelle liste des noms des colonnes
+    '''
+    
+    X_purged = X_data[:,feature_importance_array>0]
+    purged_col_names = list()
+    for i in range(len(feature_importance_array)):
+        if (feature_importance_array[i]>0):
+            purged_col_names.append(col_names[i])
+    return X_purged, purged_col_names
 
     
 # #############################################################################
@@ -2368,13 +2476,16 @@ if False:
     plt.plot(preprocessing.normalize(rfs_df['bump_score']).ravel(), preprocessing.normalize(rfs_df['count']).ravel())
     r2 = metrics.r2_score(preprocessing.normalize(rfs_df['bump_score']).ravel(), preprocessing.normalize(rfs_df['count']).ravel())
 
+
+
     # Learning by tree algorithm
     dtc = learn_tree(X, y_sts_dummy_7, min_depth = 1, max_depth = 10)
     print(metrics.confusion_matrix (y_sts_dummy_7,dtc.predict(X)))
     
     learn_tree(X, y_sts_dummy_7, min_depth = 3, max_depth = 3)
-    dtc = learn_tree(X, y_sts_dummy_7, criterion='entropy', min_depth = 3, max_depth = 3)
+    dtc = learn_tree(X, y_sts_dummy_7, criterion='gini', min_depth = 10, max_depth = 10)
     print(metrics.confusion_matrix (y_sts_dummy_7,dtc.predict(X)))
+    print(metrics.classification_report (y_sts_dummy_7,dtc.predict(X)))
 
     # Learning by LR algorithm
     lr = learn_lr(X, y_sts_dummy_7)
@@ -2383,6 +2494,7 @@ if False:
     print 'Proportion of ones in predicted Y' , float(np.sum(y_p))/len(y_p)
     print 'Proportion of ones in Y STS' , float(np.sum(y_sts_dummy_7))/len(y_sts_dummy_7)
     print(metrics.confusion_matrix (y_sts_dummy_7,lr.predict(X)))
+    print(metrics.classification_report(y_sts_dummy_7, lr.predict(X)))    
 
     # RFE
     rfe = feature_select_rfe_logistic_regression(X, y_sts_dummy_7, 1)
@@ -2425,6 +2537,34 @@ if False:
     df = pd.DataFrame(response, index=features, columns=['n', 'r'])
     sorted_df = df.sort(['r'], ascending=False)
 
+
+    # Adaboost classification
+    adaboost_model = AdaBoostClassifier(n_estimators=1)
+    adaboost_model.fit(X, y_sts_dummy_7)
+    with open(adaboost_x7_file_path, 'w') as f:
+        pickle.dump(adaboost_model,f)
+    with open(adaboost_x7_file_path) as f:
+        adaboost_model = pickle.load(f)
+    y_sts_adaboost = adaboost_model.predict(X)
+    print(metrics.confusion_matrix (y_sts_dummy_7,y_sts_adaboost))
+    print (metrics.classification_report(y_sts_dummy_7, y_sts_adaboost))    
+    x7_feautre_importance_array = adaboost_model.feature_importances_
+    x7_feature_importance_df = pd.DataFrame(x7_feautre_importance_array, index=short_column_label_list_not_sorted, columns=['feature_importance'])
+    x7_sorted_fi_df = x7_feature_importance_df.sort(['feature_importance'], ascending=[0])
+    x7_important_features_df = x7_sorted_fi_df[x7_sorted_fi_df['feature_importance']>0]
+
+    for i in range(2,11):
+        adaboost_model = AdaBoostClassifier(n_estimators=i)
+        adaboost_model.fit(X, y_sts_dummy_7)
+        y_sts_adaboost = adaboost_model.predict(X)
+        x7_feautre_importance_array = adaboost_model.feature_importances_
+        x7_feature_importance_df = pd.DataFrame(x7_feautre_importance_array, index=short_column_label_list_not_sorted, columns=['feature_importance'])
+        x7_sorted_fi_df = x7_feature_importance_df.sort(['feature_importance'], ascending=[0])
+        x7_important_features_df = x7_sorted_fi_df[x7_sorted_fi_df['feature_importance']>0]
+        print x7_important_features_df
+    
+
+
     from sklearn.decomposition import PCA
     from sklearn import preprocessing
     pca_1 = PCA(n_components=5)
@@ -2464,6 +2604,10 @@ if False:
     len(y_next_emergency_30)
 
 
+
+
+
+
     # Etude des urgences
 
     # ###########################################
@@ -2492,56 +2636,60 @@ if False:
     Rapport entre les deux = 94.12 %
     '''
     
+    create_clean_urg_case_control_data(rehosps_urg_dict, X_urg, y_urg_delay, y_urg_diags_related)    
     
-    
-    # Distribution des delais pour les rehospits diagns en rapport et sans rapport
-    plot_rehosps_delay_urg(y_urg_delay, y_urg_diags_related)
-    
-    # Separation des X_urg pour lesquels le diag est en rapport (X_urg_diags_realted) : les cas dans notre etude cas-temoin
-    X_urg_cases = X_urg[(y_urg_diags_related==1).ravel(),:]
-    
-    # Sauvegarde des X_urg_cases
-    save_sparse(X_rehosps_urg_cases_file_path,X_urg_cases)
-    
-    # Load de la matrice éparse X_urgcases
-    X_urg_cases = load_sparse(X_rehosps_urg_cases_file_path)
-    X_urg_cases.shape
-
-    # Les delais de rehospit pour les diags en rapport
-    y_urg_cases_rehosp_delay = y_urg_delay[y_urg_diags_related==1]
-    y_urg_cases_rehosp_delay = np.reshape(y_urg_cases_rehosp_delay, (len(y_urg_cases_rehosp_delay),1))
-    y_urg_cases_rehosp_delay.shape
-    
-    # Nombre total des RSA eligibles en 2013
-    # total_rsa_count_2013 = count_lines_of_the_file(rsa_clean_file_path_2013)
-    total_rsa_count_2013 = 17113724
-        
-    # Creation et sauvegarde des controles
-    X_urg_controls = create_and_save_control_rsas_rehosps_urg_X(total_rsa_count_2013, rehosps_urg_dict)
-    
-    # Fusion des matrices cas et control
-    X_urg_case_control = sparse.vstack([X_urg_cases, X_urg_controls])
-    
-    # Fusion dess y_urg_delay (cases) et un vecteur de zeros de mme taille que les controls
-    y_delay_case_controls = np.vstack([y_urg_cases_rehosp_delay, np.zeros((X_urg_controls.shape[0],1))])
-    
-    # Verification des tailles
-    X_urg_case_control.shape
-    y_delay_case_controls.shape
-    
-    # Melange des matrices
-    permutated_indexes = np.random.permutation(len(y_delay_case_controls))
-    X_urg_case_control = X_urg_case_control[permutated_indexes, :]
-    y_delay_case_controls = y_delay_case_controls[permutated_indexes,:]
-    
-    # Reverification des tailles
-    X_urg_case_control.shape
-    y_delay_case_controls.shape
-    
-    
-    # Sauvegarde des matrices case-control
-    save_sparse(X_rehosps_urg_case_controls_file_path, X_urg_case_control)
-    np.savez_compressed(y_rehosps_urg_case_controls_file_path, y_delay=y_delay_case_controls)
+#    
+#    # Separation des X_urg pour lesquels le diag est en rapport (X_urg_diags_realted) : les cas dans notre etude cas-temoin
+#    X_urg_cases = X_urg[(y_urg_diags_related==1).ravel(),:]
+#    
+#    # Sauvegarde des X_urg_cases
+#    save_sparse(X_rehosps_urg_cases_file_path,X_urg_cases)
+#    
+#    # Load de la matrice éparse X_urgcases
+#    X_urg_cases = load_sparse(X_rehosps_urg_cases_file_path)
+#    X_urg_cases.shape
+#
+#    # Les delais de rehospit pour les diags en rapport
+#    y_urg_cases_rehosp_delay = y_urg_delay[y_urg_diags_related==1]
+#    y_urg_cases_rehosp_delay = np.reshape(y_urg_cases_rehosp_delay, (len(y_urg_cases_rehosp_delay),1))
+#    y_urg_cases_rehosp_delay.shape
+#    
+#    # Nombre total des RSA eligibles en 2013
+#    # total_rsa_count_2013 = count_lines_of_the_file(rsa_clean_file_path_2013)
+#    total_rsa_count_2013 = 17113724
+#        
+#    # Creation et sauvegarde des controles
+#    X_urg_controls = create_and_save_control_rsas_rehosps_urg_X(total_rsa_count_2013, rehosps_urg_dict)
+#    
+#    # Fusion des matrices cas et control
+#    X_urg_case_control = sparse.vstack([X_urg_cases, X_urg_controls])
+#    
+#    # Fusion dess y_urg_delay (cases) et un vecteur de zeros de mme taille que les controls
+#    y_delay_case_controls = np.vstack([y_urg_cases_rehosp_delay, np.zeros((X_urg_controls.shape[0],1))])
+#    
+#    # Verification des tailles
+#    X_urg_case_control.shape
+#    y_delay_case_controls.shape
+#    
+#    # Melange des matrices
+#    permutated_indexes = np.random.permutation(len(y_delay_case_controls))
+#    X_urg_case_control = X_urg_case_control[permutated_indexes, :]
+#    y_delay_case_controls = y_delay_case_controls[permutated_indexes,:]
+#    
+#    # Reverification des tailles
+#    X_urg_case_control.shape
+#    y_delay_case_controls.shape
+# 
+#
+#   
+#    features_count_df = get_features_count(X_urg_case_control, cld=urg_column_label_dict)
+#
+#    X_urg_case_control.shape
+#    y_delay_case_controls.shape
+#    
+#    # Sauvegarde des matrices case-control
+#    save_sparse(X_rehosps_urg_case_controls_file_path, X_urg_case_control)
+#    np.savez_compressed(y_rehosps_urg_case_controls_file_path, y_delay=y_delay_case_controls)
     
 
 
@@ -2554,6 +2702,8 @@ if False:
     # Recuperation des matrices case-control
     X_urg_case_controls = load_sparse(X_rehosps_urg_case_controls_file_path)
     y_delay_case_controls = np.load(y_rehosps_urg_case_controls_file_path)['y_delay']
+    with open(actual_column_label_urg_list_file_path) as f:
+        actual_urg_cols_list = pickle.load(f)
     
     X_urg_case_controls.shape
     y_delay_case_controls.shape
@@ -2561,32 +2711,82 @@ if False:
     # Labels 0=par de rehosp en urgences, 1=rehosp en urgence avec dp ou dr egaux entre les deux sejours
     y_rehosp_case_controls = 1*(y_delay_case_controls>0)
     
+    # Distribution des delais pour les rehospits diagns en rapport et sans rapport
+    plot_rehosps_delay_urg(y_urg_delay, y_urg_diags_related, include_diags_no_related=False)
     
     # ###########################################
     #        Apprentissage
     
-    X_urg_case_control, y_rehosp_case_controls = load_urg_X_y_case_control_as_sparce_and_vector()
-    X_urg_case_control.shape
-    y_rehosp_case_controls.shape
-    
     # Learning by LR algorithm
     lr_l1 = LogisticRegression(penalty='l1', verbose=1)
-    lr_l1.fit(X_urg_case_control, y_rehosp_case_controls)
-    y_p_l1 = lr_l1.predict(X_urg_case_control)
+    lr_l1.fit(X_urg_case_controls, y_rehosp_case_controls)
+    y_p_l1 = lr_l1.predict(X_urg_case_controls)
     print(metrics.confusion_matrix (y_rehosp_case_controls,y_p_l1))
     print (metrics.classification_report(y_rehosp_case_controls, y_p_l1))    
 
     lr_l2 = LogisticRegression(penalty='l2', verbose=1)
-    lr_l2.fit(X_urg_case_control, y_rehosp_case_controls)
-    y_p_l2 = lr_l2.predict(X_urg_case_control)
+    lr_l2.fit(X_urg_case_controls, y_rehosp_case_controls)
+    y_p_l2 = lr_l2.predict(X_urg_case_controls)
     print(metrics.confusion_matrix (y_rehosp_case_controls,y_p_l2))
     print (metrics.classification_report(y_rehosp_case_controls, y_p_l2))    
     
+    
+    urg_dtc = learn_tree(X_urg_case_controls, y_rehosp_case_controls, col_names_dict=rehosps_urg_dict,  max_depth=20, dtc_fp=urg_tree_dot_file_path, dot_fp=urg_tree_dot_file_path, pdf_fp=urg_tree_pdf_file_path)
+    y_p_dtc = urg_dtc.predict(X_urg_case_controls)
+    print(metrics.confusion_matrix (y_rehosp_case_controls,y_p_dtc))
+    print (metrics.classification_report(y_rehosp_case_controls, y_p_dtc))    
+   
+    
+    
     model = AdaBoostClassifier()
-    model.fit(X_urg_case_control, y_rehosp_case_controls)
-    y_p_adaboost = model.predict(X_urg_case_control)
+    model.fit(X_urg_case_controls, y_rehosp_case_controls)
+    y_p_adaboost = model.predict(X_urg_case_controls)
+    print(metrics.confusion_matrix (y_rehosp_case_controls,y_p_adaboost))
+    print (metrics.classification_report(y_rehosp_case_controls, y_p_adaboost))    
+    
+    # Saving the adaboost model
+    with open(adaboost_file_path, 'w') as f:
+        pickle.dump(model, f)
+    
+    # Loading the Adaboost model
+    with open(adaboost_file_path) as f:
+        adaboost_model = pickle.load(f)
+
+    y_p_adaboost = adaboost_model.predict(X_urg_case_controls)
+    print(metrics.confusion_matrix (y_rehosp_case_controls,y_p_adaboost))
+    print (metrics.classification_report(y_rehosp_case_controls, y_p_adaboost))    
+ 
+        
+    feature_importance_array = adaboost_model.feature_importances_
+    feature_importance_df = pd.DataFrame(feature_importance_array, index=actual_urg_cols_list, columns=['feature_importance'])
+    sorted_fi_df = feature_importance_df.sort(['feature_importance'], ascending=[0])
+    important_features_df = sorted_fi_df[sorted_fi_df['feature_importance']>0]
+        
+    purged_X, purged_cols_list = get_X_with_important_features(X_urg_case_controls, actual_urg_cols_list, feature_importance_array)
+    # Learning by LR algorithm
+    lr_l1 = LogisticRegression(penalty='l1', verbose=1)
+    lr_l1.fit(purged_X, y_rehosp_case_controls)
+    y_p_l1 = lr_l1.predict(purged_X)
+    print(metrics.confusion_matrix (y_rehosp_case_controls,y_p_l1))
+    print (metrics.classification_report(y_rehosp_case_controls, y_p_l1))    
+
+    purged_ada_boost = AdaBoostClassifier()
+    purged_ada_boost.fit(purged_X, y_rehosp_case_controls)
+    y_p_adaboost = purged_ada_boost.predict(purged_X)
     print(metrics.confusion_matrix (y_rehosp_case_controls,y_p_adaboost))
     print (metrics.classification_report(y_rehosp_case_controls, y_p_adaboost))    
     
     
+    rfc = RandomForestClassifier(verbose=1)
+    rfc.fit(purged_X, y_rehosp_case_controls.ravel())
+    y_p_rfc = rfc.predict(purged_X)
+    print(metrics.confusion_matrix (y_rehosp_case_controls,y_p_rfc))
+    print (metrics.classification_report(y_rehosp_case_controls, y_p_rfc))    
+    
+    urg_purged_rfe = feature_select_rfe_logistic_regression(purged_X, y_rehosp_case_controls.ravel(), 1)
+    for i in urg_purged_rfe.ranking_:
+        print purged_cols_list[i]
+    
+    dtc = learn_tree(purged_X, y_rehosp_case_controls, min_depth = 1, max_depth = 50)
+    print(metrics.confusion_matrix (y_sts_dummy_7,dtc.predict(X)))
     
