@@ -29,8 +29,10 @@ from sklearn.feature_selection import chi2, f_classif
 from sklearn.ensemble import AdaBoostClassifier
 from sklearn.ensemble import RandomForestClassifier
 from scipy import sparse, vstack
+from sklearn.cross_validation import cross_val_predict, cross_val_score
 
 imp.reload(file_paths)
+
 
 
 full_column_label_dict = {}
@@ -2754,7 +2756,9 @@ if False:
 
     y_p_adaboost = adaboost_model.predict(X_urg_case_controls)
     print(metrics.confusion_matrix (y_rehosp_case_controls,y_p_adaboost))
-    print (metrics.classification_report(y_rehosp_case_controls, y_p_adaboost))    
+    print (metrics.classification_report(y_rehosp_case_controls, y_p_adaboost))
+    adaboost_model.feature_importances_
+    adaboost_model.estimator_weights_
  
         
     feature_importance_array = adaboost_model.feature_importances_
@@ -2763,6 +2767,8 @@ if False:
     important_features_df = sorted_fi_df[sorted_fi_df['feature_importance']>0]
         
     purged_X, purged_cols_list = get_X_with_important_features(X_urg_case_controls, actual_urg_cols_list, feature_importance_array)
+
+    purged_X.shape
     # Learning by LR algorithm
     lr_l1 = LogisticRegression(penalty='l1', verbose=1)
     lr_l1.fit(purged_X, y_rehosp_case_controls)
@@ -2777,7 +2783,7 @@ if False:
     print (metrics.classification_report(y_rehosp_case_controls, y_p_adaboost))    
     
     
-    rfc = RandomForestClassifier(verbose=1)
+    rfc = RandomForestClassifier(n_estimators=48, verbose=1)
     rfc.fit(purged_X, y_rehosp_case_controls.ravel())
     y_p_rfc = rfc.predict(purged_X)
     print(metrics.confusion_matrix (y_rehosp_case_controls,y_p_rfc))
@@ -2789,4 +2795,21 @@ if False:
     
     dtc = learn_tree(purged_X, y_rehosp_case_controls, min_depth = 1, max_depth = 50)
     print(metrics.confusion_matrix (y_sts_dummy_7,dtc.predict(X)))
+    
+    depth_score_list = list()
+    for depth in range(1, 50):
+        print 'depth=', str(depth)
+        dtc = DecisionTreeClassifier(criterion='gini', max_depth=depth)
+        cv_scores = cross_val_score(dtc, purged_X, y=y_rehosp_case_controls.ravel(), cv=10, n_jobs=-1, verbose=1)
+        depth_score_list.append((depth, np.mean(cv_scores)))
+
+    depth_precision_recall_list = list()
+    for depth in range(1, 102, 5):
+        dtc = DecisionTreeClassifier(criterion='gini', max_depth=depth)
+        preds = cross_val_predict(dtc_2, purged_X, y=y_rehosp_case_controls.ravel(), cv=10, n_jobs=-1)
+        response = metrics.precision_recall_fscore_support(y_rehosp_case_controls.ravel(), preds)
+        tup = (depth, response[0][1], response[1][1])
+        depth_precision_recall_list.append(tup)
+        print tup
+
     
