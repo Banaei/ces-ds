@@ -17,6 +17,7 @@ import pickle
 import random as rnd
 import numpy as np
 import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 import pandas as pd
 from sklearn.linear_model import LogisticRegression
 from sklearn import tree
@@ -30,6 +31,7 @@ from sklearn.ensemble import AdaBoostClassifier
 from sklearn.ensemble import RandomForestClassifier
 from scipy import sparse, vstack
 from sklearn.cross_validation import cross_val_predict, cross_val_score
+from sklearn.neighbors import KNeighborsClassifier
 
 imp.reload(file_paths)
 
@@ -1547,7 +1549,7 @@ def learn_tree(X_data, Y_data, col_names_dict=short_column_label_dict , criterio
 
     col_names = ['']*len(col_names_dict)
     for key in short_column_label_dict:
-        col_names[short_column_label_dict[key]]=key
+        col_names[col_names_dict[key]]=key
 
     f = tree.export_graphviz(dtc, out_file=dot_fp, feature_names=col_names) # clf: tree classifier
     os.system("dot -Tpdf " + dot_fp + " -o " + pdf_fp)
@@ -2331,6 +2333,23 @@ def get_X_with_important_features(X_data, col_names, feature_importance_array):
             purged_col_names.append(col_names[i])
     return X_purged, purged_col_names
 
+
+def plot_3d(X, azimuth=-160, elevation=60):
+    """
+    Draws a 3-d plot of data points with x-axis as longitude, y-axis as latitude and z-axis as age (in years)
+    """
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    plt.xlim((np.min(X[:,1])-5,np.max(X[:,1])+5))
+    plt.ylim((np.min(X[:,0])-1,np.max(X[:,0])+1))
+    ax.scatter(X[:,1], X[:,0], X[:,2], c='b', marker='.')
+    ax.set_xlabel('Longiture')
+    ax.set_ylabel('Latitude')
+    ax.set_zlabel('BS')
+    ax.azim = azimuth
+    ax.elev = elevation   
+    plt.show()
+        
     
 # #############################################################################
 # #############################################################################
@@ -2491,6 +2510,7 @@ if False:
 
     # Learning by LR algorithm
     lr = learn_lr(X, y_sts_dummy_7)
+    lr.coef_
     print 'Score for LR STS : ', lr.score(X, y_sts_dummy_7)
     y_p = lr.predict(X)
     print 'Proportion of ones in predicted Y' , float(np.sum(y_p))/len(y_p)
@@ -2719,6 +2739,13 @@ if False:
     # ###########################################
     #        Apprentissage
     
+    
+    
+    # KNN
+    knn_classifier = KNeighborsClassifier(n_neighbors=10)
+    cv_scores = cross_val_score(knn_classifier, X_urg_case_controls, y=y_rehosp_case_controls.ravel(), cv=10, n_jobs=-1, verbose=1)
+    
+    
     # Learning by LR algorithm
     lr_l1 = LogisticRegression(penalty='l1', verbose=1)
     lr_l1.fit(X_urg_case_controls, y_rehosp_case_controls)
@@ -2812,4 +2839,178 @@ if False:
         depth_precision_recall_list.append(tup)
         print tup
 
+
+    model = AdaBoostClassifier(n_estimators=6)
+    model.fit(X_urg_case_controls, y_rehosp_case_controls)
+    y_p_adaboost = model.predict(X_urg_case_controls)
+    print(metrics.confusion_matrix (y_rehosp_case_controls,y_p_adaboost))
+    print (metrics.classification_report(y_rehosp_case_controls, y_p_adaboost))    
+    feature_importance_array = model.feature_importances_
+    feature_importance_df = pd.DataFrame(feature_importance_array, index=actual_urg_cols_list, columns=['feature_importance'])
+    sorted_fi_df = feature_importance_df.sort(['feature_importance'], ascending=[0])
+    important_features_df = sorted_fi_df[sorted_fi_df['feature_importance']>0]
     
+
+
+
+
+    purged_X, purged_cols_list = get_X_with_important_features(X_urg_case_controls, actual_urg_cols_list, feature_importance_array)
+
+    purged_X.shape
+    purged_cols_list
+    
+
+    purged_dtc = DecisionTreeClassifier(max_depth=20)
+    purged_dtc.fit(purged_X, y_rehosp_case_controls)
+    y_p_purged_dtc = purged_dtc.predict(purged_X)
+    print(metrics.classification_report(y_rehosp_case_controls, y_p_purged_dtc))    
+    
+    f = tree.export_graphviz(purged_dtc, out_file=results_directory + 'purged_urg_dtc.dot', feature_names=purged_cols_list) # clf: tree classifier
+    os.system("dot -Tpdf " + results_directory + 'purged_urg_dtc.dot' + " -o " + results_directory + 'purged_urg_dtc.pdf')
+    
+    
+    purged_ada_boost = AdaBoostClassifier(n_estimators=6)
+    purged_ada_boost.fit(purged_X, y_rehosp_case_controls)
+    y_p_purged_adaboost = purged_ada_boost.predict(purged_X)
+    print(metrics.confusion_matrix (y_rehosp_case_controls,y_p_purged_adaboost))
+    print (metrics.classification_report(y_rehosp_case_controls, y_p_purged_adaboost))    
+    
+    lr_purged_l1 = LogisticRegression(penalty='l1', verbose=1)
+    lr_purged_l1.fit(purged_X, y_rehosp_case_controls)
+    y_p_purged_l1 = lr_purged_l1.predict(purged_X)
+    print(metrics.confusion_matrix (y_rehosp_case_controls,y_p_purged_l1))
+    print (metrics.classification_report(y_rehosp_case_controls, y_p_purged_l1))    
+    lr_purged_l1.coef_
+    
+    
+    dpt_gps_csv_file_path = refs_directory + 'dpt_gps.csv'
+    dpt_gps_df = pd.read_csv(dpt_gps_csv_file_path, names=['dpt', 'latitude', 'longitude'])
+    depts_dict = {}
+    for index, row in dpt_gps_df.iterrows():
+        if row['dpt'] not in depts_dict:
+            depts_dict[row['dpt']] = list()
+        try:
+            depts_dict[row['dpt']].append([row['latitude'], float(row['longitude'])])
+        except ValueError:
+            print row['longitude'], ' skipped'
+
+    np.mean(depts_dict['95'],0)
+
+
+    dpt_centers_dict = {}
+    for dpt in depts_dict:
+        dpt_centers_dict[dpt] = np.mean(depts_dict[dpt],0)
+        
+    bs_dpt = [ 
+    ['01',1.938482],
+    ['02',2.483016],
+    ['03',2.750823],
+    ['04',2.205905],
+    ['05',2.071368],
+    ['06',2.42014],
+    ['07',2.440046],
+    ['08',1.764379],
+    ['09',1.873601],
+    ['10',2.470072],
+    ['11',1.936793],
+    ['12',2.085798],
+    ['13',2.521207],
+    ['14',2.164023],
+    ['15',1.953619],
+    ['16',2.824276],
+    ['17',2.471834],
+    ['18',2.127245],
+    ['19',2.061126],
+    ['21',2.62681],
+    ['22',2.089007],
+    ['23',1.82214],
+    ['24',2.023299],
+    ['25',2.091939],
+    ['26',2.054131],
+    ['27',3.146722],
+    ['28',1.941726],
+    ['29',2.234438],
+    ['2A',2.188296],
+    ['2B',2.376101],
+    ['30',2.387214],
+    ['31',2.305563],
+    ['32',1.836733],
+    ['33',2.511806],
+    ['34',2.541594],
+    ['35',2.702559],
+    ['36',1.575985],
+    ['37',2.349073],
+    ['38',2.36963],
+    ['39',1.704837],
+    ['40',2.567182],
+    ['41',2.152931],
+    ['42',2.104235],
+    ['43',3.228487],
+    ['44',2.796862],
+    ['45',2.456699],
+    ['46',1.636719],
+    ['47',2.277889],
+    ['48',1.981369],
+    ['49',2.354871],
+    ['50',2.207336],
+    ['51',2.084428],
+    ['52',2.209222],
+    ['53',2.061967],
+    ['54',2.42304],
+    ['55',1.808917],
+    ['56',2.341589],
+    ['57',2.147898],
+    ['58',1.860014],
+    ['59',2.092433],
+    ['60',1.95109],
+    ['61',1.652474],
+    ['62',1.860896],
+    ['63',2.516087],
+    ['64',2.462593],
+    ['65',2.253085],
+    ['66',2.594462],
+    ['67',2.230161],
+    ['68',2.479817],
+    ['69',2.381405],
+    ['70',1.812784],
+    ['71',2.263412],
+    ['72',1.981097],
+    ['73',2.47581],
+    ['74',2.367976],
+    ['76',2.099555],
+    ['77',2.180855],
+    ['78',2.147225],
+    ['79',2.378435],
+    ['80',1.840135],
+    ['81',1.873308],
+    ['82',2.19563],
+    ['83',2.385452],
+    ['84',2.58121],
+    ['85',2.031212],
+    ['86',2.748977],
+    ['87',2.378741],
+    ['88',1.597722],
+    ['89',2.000107],
+    ['90',2.110677],
+    ['91',1.96249],
+    ['92',2.322229],
+    ['93',1.937571],
+    ['94',2.359891],
+    ['95',2.076309]]
+
+    dpt_bs_dict = {}
+    for l in bs_dpt :
+        dpt_bs_dict[l[0]]=l[1]
+        
+    data_dpt_bs = np.zeros((len(dpt_bs_dict),3))
+    i = 0
+    for dpt in dpt_bs_dict:
+        data_dpt_bs[i,0] = dpt_centers_dict[dpt][0]
+        data_dpt_bs[i,1] = dpt_centers_dict[dpt][1]
+        data_dpt_bs[i,2] = dpt_bs_dict[dpt]
+        i += 1
+        
+
+    plot_3d(data_dpt_bs)
+        
+        
